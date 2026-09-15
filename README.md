@@ -45,6 +45,10 @@ cd ~/.pi/agent/npm && npm install
 三个来源，全部是第三方仓库，按需 clone 到 `~/.pi/agent/skills/`：
 
 ```bash
+# herdr（1 个：让 pi 在 Herdr pane 内主动控制 pane/tab/workspace/其他 agent）
+# 用已装二进制自带的 release-matched 副本，比 GitHub master 更可靠：
+herdr --skill > ~/.pi/agent/skills/herdr/SKILL.md
+
 # pi-skills（8 个：brave-search / exa 搜索、浏览器工具、Gmail/Calendar/Drive CLI 等）
 git clone https://github.com/badlogic/pi-skills ~/.pi/agent/skills/pi-skills
 
@@ -85,6 +89,15 @@ herdr integration status          # 验证
 ```
 
 该文件由 Herdr 生成与管理（重装会覆盖），**不在本仓库内**（见 `.gitignore`）。
+
+⚠️ **集成 ≠ 技能**，两者方向相反，别混：
+
+| | 文件 | 方向 | 作用 |
+|---|---|---|---|
+| 集成 | `extensions/herdr-agent-state.ts` | pi → Herdr | pi 上报自己的 `idle/working/blocked` |
+| 技能 | `skills/herdr/SKILL.md` | Herdr → pi | 教 pi 如何操作 pane/tab/workspace/其他 agent |
+
+只装集成时，Herdr 看得见 pi，但 pi 用不上 Herdr。
 
 它会向 Herdr 的本地 Unix socket 上报 agent 状态（`idle` / `working` / `blocked`）。
 权限画像：仅 `import net`，零子进程、零网络、零文件读写，且以 `HERDR_ENV=1`
