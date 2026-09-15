@@ -74,7 +74,23 @@ pi 会把**所有**已发现技能的 name + description 注入系统提示—�
 pi --skill ~/.pi/agent/skills-optional/scientific-agent-skills/skills/qutip/SKILL.md
 ```
 
-### 3. 密钥
+### 3. Herdr 集成（可选）
+
+若在 [Herdr](https://herdr.dev) 的 pane 内使用 pi，安装官方集成以获得
+**原生会话恢复 + 生命周期状态上报**：
+
+```bash
+herdr integration install pi      # 写入 extensions/herdr-agent-state.ts
+herdr integration status          # 验证
+```
+
+该文件由 Herdr 生成与管理（重装会覆盖），**不在本仓库内**（见 `.gitignore`）。
+
+它会向 Herdr 的本地 Unix socket 上报 agent 状态（`idle` / `working` / `blocked`）。
+权限画像：仅 `import net`，零子进程、零网络、零文件读写，且以 `HERDR_ENV=1`
+为门控——不在 Herdr 内运行时完全惰性。
+
+### 4. 密钥
 
 `auth.json` 需手动创建，格式：
 
