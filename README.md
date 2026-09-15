@@ -343,6 +343,22 @@ git --git-dir=~/.pi/agent-private.git checkout -f main
 ```
 
 日常操作私密层：`bash tools/private.sh status|diff|commit|push`。
+
+**已有公共库的机器接入私密层**（工作树已有内容，非全新 bootstrap）：
+```bash
+cd ~/.pi/agent && git pull                       # 1. 公共层取最新（拿到 tools/private.sh）
+# 2. 若本地对 bash-guard/analyze-sessions 等私密路径有未提交手改 → 先自行备份
+git clone --bare https://github.com/SuTang-vain/pi-config-private.git ~/.pi/agent-private.git
+git --git-dir=~/.pi/agent-private.git config core.worktree ~/.pi/agent
+git --git-dir=~/.pi/agent-private.git config --bool core.bare false
+git --git-dir=~/.pi/agent-private.git config user.name  "SuTang-vain"
+git --git-dir=~/.pi/agent-private.git config user.email "183297372+SuTang-vain@users.noreply.github.com"
+git --git-dir=~/.pi/agent-private.git checkout -f main  # 3. 成品覆盖本地（含全部补丁）
+# 4. 运行时补装：cd extensions/bash-guard && npm install
+#                  cd skills-optional/pdf-reader && python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
+# 5. 验证：python3 tools/apply-local-patches.py --check  → 五补丁应全「已应用（跳过）」
+#          bash tools/check-upstream-drift.sh            → 上游列应全「未动」
+```
 两层推送前都过密钥扫描闸门（auth.json / sessions 永不入任何一层）。
 
 ## 上游更新策略
