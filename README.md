@@ -277,6 +277,11 @@ cp -R /tmp/amos-src/skills/pdf-reader ~/.pi/agent/skills-optional/ && cd ~/.pi/a
 均不注入该变量）：改为三重检测 `PI_SUBAGENT_ID`（@maplezzk pane 子代理）/
 `PI_SUBAGENT_RUNNER_CONFIG`（pi-subagents 无头 runner）/ `!stdin.isTTY`（通用无头）。
 
+**pi-filechanges 本地补丁（默认关闭 widget）**：npm 包 `extensions/index.ts` 的
+`showWidget` 硬编码 true 且无配置机制，本地改为 `false`——Δ 文件清单默认不显示，
+`/filechanges` 会话内仍可开；状态栏槽位（有改动时的一行摘要）保留。
+⚠ `pi update npm:@johnnywu/pi-filechanges` 会还原此补丁，更新后需重打。
+
 **bash-guard 本地补丁 ②（UI 稳定化）**：对话框原为裸 `overlay: true`，居中锚点随命令长度
 漂移且与部件堆栈（filechanges/subagents/prompt-snippets）显示冲突。改为
 `anchor: top-center + margin 2 + width 70% + maxHeight 60%` + 命令显示截断 160 字符 +
