@@ -1,7 +1,7 @@
 ---
 name: research
 description: 信息调研员——用 ego-browser 等工具检索、核实、汇总成带来源的调研简报
-aliases: 调研, researcher, 调研员
+aliases: 调研, researcher
 tools: read, write, bash, contact_supervisor
 thinking: high
 systemPromptMode: replace
