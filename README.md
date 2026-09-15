@@ -16,6 +16,7 @@
 | `agents/` | 三个自定义子代理：`research` / `scout` / `worker` |
 | `extensions/productivity/` | 自写的效率扩展套件，6 个模块 |
 | `npm/package.json` · `package-lock.json` | 扩展包的精确版本锁定 |
+| `scripts/` | 运维脚本：上游漂移检测器 + 快照账本（**非 pi 扩展**，故不放 `tools/`，见「上游更新策略」） |
 | `run-history.jsonl` | 子代理运行记录（任务已脱敏） |
 
 ## 明确排除的内容
@@ -363,8 +364,24 @@ git --git-dir=~/.pi/agent-private.git checkout -f main  # 3. 成品覆盖本地�
 
 ## 上游更新策略
 
-借鉴件分四类，各有既定的更新路径；`tools/check-upstream-drift.sh` 对照
-`tools/upstream-snapshot.json`（快照账本：本地/上游 sha256 + npm 版本）报三态漂移。
+借鉴件分四类，各有既定的更新路径；`scripts/check-upstream-drift.sh` 对照
+`scripts/upstream-snapshot.json`（快照账本：本地/上游 sha256 + npm 版本）报三态漂移。
+
+```bash
+bash ~/.pi/agent/scripts/check-upstream-drift.sh             # 检测：退出码 0 无漂移 / 1 有漂移 / 2 环境错误
+bash ~/.pi/agent/scripts/check-upstream-drift.sh --refresh   # 上游合并完成后重签账本
+PI_DRIFT_SKIP_NPM=1 bash ~/.pi/agent/scripts/check-upstream-drift.sh   # 跳过 npm registry（离线自检）
+```
+
+> ⚠️ **别把它放回 `tools/`。** pi 0.85.1 的启动迁移会把 `<agentDir>/tools/` 下
+> 任何不以 `.` 开头、且不叫 `fd`/`rg`/`fd.exe`/`rg.exe` 的条目判为「遗留自定义工具」，
+> 打印警告并**阻塞等按键**——它只看条目名，分不清脚本/数据与真扩展。
+> 而 `tools/` 自 0.85.1 起已不是扩展目录（`fd`/`rg` 改由 `getBinDir()` 落到 `bin/`，
+> `getToolsDir()` 在源码中已无调用点）。私有运维脚本一律放 `scripts/`。
+
+报告的三种行状态：`⬆ 上游有更新` / `⚠ 本地意外漂移`（`patched:false` 却有改动）/
+`🔧 补丁后又变`（`patched:true`，需对照源码内标记重审）；另有 `⛔ 本机未安装`、
+`🆕 新装`、`❓ 上游查询失败` 三种非漂移信息态。
 
 | 类 | 组件 | 更新动作 |
 |---|---|---|
@@ -373,7 +390,10 @@ git --git-dir=~/.pi/agent-private.git checkout -f main  # 3. 成品覆盖本地�
 | **C 有补丁 npm** | @johnnywu/pi-filechanges（补丁③） | `pi update` 会覆写补丁；更新后重打一行改（showWidget=false）。**长期方案**：向上游提 PR 加配置项（包活跃维护中，PR 合并后补丁可退役） |
 | **D git 克隆** | pi-skills / scientific-agent-skills | 直接 `git pull`——sparse-checkout 保证排除项不回流，本地零修改故无冲突 |
 
-快照账本刷新：上游有更新并完成合并后，重跑账本生成（README 本节有命令）。
+快照账本刷新：上游有更新并完成合并后，在本机重跑 `--refresh`。
+**`--refresh` 不会把别人的基准洗掉**：本机未安装的组件、上游拉取失败的条目，
+都会沿用旧账本的哈希/版本（并在 stderr 标出数量），只有能真实取到值时才覆盖；
+采集为空或新账本 JSON 校验不过则**拒绝写入**，原文件保持不动。
 
 **多机注意**：账本的 `local_sha256` 是**生成它的那台机器**的快照（含补丁态）；
 其他机器跑检测器时，「本地漂移」列仅供自检——以各机源码内 `Local patch N:`
