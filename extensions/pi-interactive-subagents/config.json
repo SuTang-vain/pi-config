@@ -1,0 +1,3 @@
+{
+  "subagentExtensions": ["extensions/bash-guard"]
+}
