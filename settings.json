@@ -1,0 +1,33 @@
+{
+  "defaultModel": "glm-5.3",
+  "defaultProvider": "zai-coding-cn",
+  "defaultThinkingLevel": "high",
+  "images": {
+    "blockImages": false
+  },
+  "lastChangelogVersion": "0.85.1",
+  "modelThinkingLevels": {
+    "zai-coding-cn/glm-5.3": "high",
+    "zai-coding-cn/glm-5.3-flash": "max",
+    "deepseek/deepseek-flash": "high"
+  },
+  "showCacheMissNotices": true,
+  "skills": [
+    "~/.pi/agent/skills-optional/scientific-agent-skills/skills/exa-search/SKILL.md",
+    "~/.pi/agent/skills-optional/scientific-agent-skills/skills/pi-agent/SKILL.md",
+    "~/.pi/agent/skills-optional/scientific-agent-skills/skills/pyhealth/SKILL.md",
+    "~/.pi/agent/skills-optional/scientific-agent-skills/skills/hypothesis-generation/SKILL.md",
+    "~/.pi/agent/skills-optional/scientific-agent-skills/skills/database-lookup/SKILL.md",
+    "~/.pi/agent/skills-optional/scientific-agent-skills/skills/literature-review/SKILL.md",
+    "~/.pi/agent/skills-optional/scientific-agent-skills/skills/paper-lookup/SKILL.md",
+    "~/.pi/agent/skills-optional/scientific-agent-skills/skills/scikit-learn/SKILL.md"
+  ],
+  "steeringMode": "one-at-a-time",
+  "theme": "dark/dark",
+  "tuiMode": "fullscreen",
+  "packages": [
+    "npm:pi-subagents",
+    "npm:@juicesharp/rpiv-ask-user-question",
+    "npm:pi-goal-x"
+  ]
+}

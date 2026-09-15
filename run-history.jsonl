@@ -1,0 +1,3 @@
+{"agent":"research","task":"[redacted]","taskHash":"49636995fe38864f6b19e66d12b9a6d4e082537673eaf3a9eefa08ab81e83235","ts":1789442605,"status":"ok","outcome":"completed","duration":8395}
+{"agent":"scout","task":"[redacted]","taskHash":"4d9a8d23ae3c4e62af5d3c33520602b909d68e4e32831a51977c370585cc5244","ts":1789442663,"status":"ok","outcome":"completed","duration":27977}
+{"agent":"worker","task":"[redacted]","taskHash":"576f2c4ea6de4774c9838e18df4f20bb8533ce99618c4874f75ba4e0a4fc1141","ts":1789442677,"status":"ok","outcome":"completed","duration":7099}
