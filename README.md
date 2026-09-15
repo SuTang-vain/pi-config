@@ -23,9 +23,9 @@
 | 排除项 | 体积 | 原因 |
 |---|---|---|
 | `auth.json` | 468 B | **含明文 API 密钥。公开仓库会被爬虫分钟级抓取。绝不提交。** |
-| `sessions/` | 93 MB | 私有对话记录 |
-| `skills/` · `skills-optional/` | 约 493 MB | 第三方技能库，可重装；体积也不适合入 git |
-| `npm/node_modules/` | 19 MB | 第三方包，由 `package-lock.json` 还原 |
+| `sessions/` | 98 MB | 私有对话记录（日增，数字为 2026-09-15 实测） |
+| `skills/` · `skills-optional/` | 约 562 MB | 第三方技能库，可重装；体积也不适合入 git |
+| `npm/node_modules/` | 20 MB | 第三方包，由 `package-lock.json` 还原 |
 | `missions/` | 24 KB | 含本机绝对路径与用户名 |
 
 ---
@@ -94,14 +94,15 @@ pi 会把**所有**已发现技能的 name + description 注入系统提示—�
 省下的钱不多（约 $0.024/会话），真正的收益是上下文空间与注意力不被稀释：
 163 个化学、量子、实验室自动化技能与日常编码无关。
 
-#### 实际生效的技能（11 个）
+#### 实际生效的技能（12 个）
 
 ```
 白名单 8 个 : exa-search · pi-agent · pyhealth · hypothesis-generation
 database-lookup · literature-review · paper-lookup · scikit-learn
 
-自动扫描 3 个 : ego-browser（~/.agents/skills/）
+自动扫描 4 个 : ego-browser（~/.agents/skills/）
              : herdr（skills/herdr/）
+             : analyze-sessions（skills/，amos 借鉴件）
              : vscode（pi-skills，唯一保留项）
 ```
 
@@ -251,6 +252,10 @@ curl -sL https://github.com/amosblomqvist/pi-config/archive/refs/heads/main.tar.
 cp -R /tmp/amos-src/skills/analyze-sessions ~/.pi/agent/skills/
 cp -R /tmp/amos-src/extensions/bash-guard ~/.pi/agent/extensions/ && cd ~/.pi/agent/extensions/bash-guard && npm install
 cp -R /tmp/amos-src/extensions/prompt-snippets ~/.pi/agent/extensions/
+cp /tmp/amos-src/deprecated/extensions/context.ts ~/.pi/agent/extensions/
+cp /tmp/amos-src/deprecated/extensions/md-link.ts ~/.pi/agent/extensions/
+cp -R /tmp/amos-src/skills/pdf-reader ~/.pi/agent/skills-optional/ && cd ~/.pi/agent/skills-optional/pdf-reader && python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
+# bash-guard 需重打本地补丁（三重子代理检测，见上表说明）
 ```
 
 **bash-guard 本地补丁**（上游按 `PI_SUBAGENT_DEPTH` 识别子代理，但本机两个子代理引擎
@@ -270,7 +275,7 @@ spawn 子进程用 `--no-extensions` + 显式白名单）：见
 | `pi-web-access` (npm) | 810 tok/会话 + 132 依赖 + 7 MB | Exa 部分与 `exa-search` 完全重复；PDF/YouTube 已被其他技能覆盖 | `pi install npm:pi-web-access` |
 | `browser-tools` | 120 MB | 8 个脚本 100% 被 `ego-browser` 覆盖；正文提取由 `exa_extract.py` 替代 | 改 `pi-skills` 的 sparse 规则后 `npm install` |
 | `brave-search` | 29 MB | 无 `BRAVE_API_KEY`，无法工作 | 同上（sparse 规则） |
-| `agent-reach` | 230 tok | 依赖 OpenCLI / twitter-cli / bili-cli 三套外部后端 + 浏览器登录态；其中 GitHub/YouTube/任意网页/语义搜索四项均已被 `gh` / `youtube-transcript` / `ego-browser` / `exa-search` 覆盖 | `mv ~/.pi/agent/skills-optional/agent-reach ~/.agents/skills/` |
+| `agent-reach` | 230 tok | 依赖 OpenCLI / twitter-cli / bili-cli 三套外部后端 + 浏览器登录态；其中 GitHub/YouTube/任意网页/语义搜索四项均已被 `gh` / `youtube-transcript` / `ego-browser` / `exa-search` 覆盖。**已归档**于 `skills-optional/agent-reach/`（不在扫描路径，零注入） | `mv ~/.pi/agent/skills-optional/agent-reach ~/.agents/skills/` |
 | `@jackwener/opencli` (npm -g) | 29 MB + 228 KB + 14 MB 常驻守护 | 仅 agent-reach 使用；agent-reach 移除后成为孤儿 | `npm i -g @jackwener/opencli` |
 | `minimax-cn` provider | 3 个死条目 | 无 API 密钥，选中即报错 | 编辑 `models-store.json` |
 | `moonshotai-cn` provider | 4 个死条目 | 无 API 密钥（Kimi 模型由 kimi-coding 网关正常提供），选中即报错 | 编辑 `models-store.json` |
