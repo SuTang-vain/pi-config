@@ -103,6 +103,21 @@ herdr integration status          # 验证
 权限画像：仅 `import net`，零子进程、零网络、零文件读写，且以 `HERDR_ENV=1`
 为门控——不在 Herdr 内运行时完全惰性。
 
+⚠️ **hook 只在 agent 启动时加载。** 装集成**不会**影响当时正在跑的 pi 会话；
+已存在的 agent 必须重启才会从「屏幕猜状态」切到权威上报。验证方式：
+
+```bash
+herdr agent explain <target>
+# 权威：screen_detection_skip_reason: full_lifecycle_hook_authority
+# 猜屏：fallback_reason: default_known_agent_idle_fallback
+```
+
+Herdr 侧的完整说明——两个集成的差异、实测对照、以及**无损重载已有 agent**
+的脚本（保留上下文 / todo / MCP）——见
+**[SuTang-vain/herdr-config](https://github.com/SuTang-vain/herdr-config)**。
+
+> 注：无损重载目前只验证了 `kind=kimi`；pi 的退出与恢复参数未实测。
+
 ### 4. 密钥
 
 `auth.json` 需手动创建，格式：
