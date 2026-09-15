@@ -284,6 +284,12 @@ HIGH（sudo / rm -rf / find -delete / git rm|clean -f|reset --hard|push --force 
 实测：git status 静默直通；rm -r* 复合命令弹「HIGH risk」对话框（含理由）。
 注：pi 会热加载扩展到运行中的会话——扩展装入后行为即生效。
 
+**bash-guard 本地补丁 ⑤（选项区可读性）**：选项区原仅箭头+着色区分，描述被宽度截断。
+改为：选项前分隔线（choose an action）、标签带图标（Run ⏎ / Abort ✕）与更明确描述、
+选中项加粗、底部按键提示行（↑↓ move · ⏎ confirm · esc = abort）、
+宽度 70%→85%（minWidth 56）、高度上限 60%→80%（矮 pane 曾把 Abort 行裁掉）、
+命令显示截断 160→120 字符。实测矮 pane 下双选项+提示完整渲染，↓+Enter 拦截生效。
+
 **pi-filechanges 本地补丁（默认关闭 widget）**：npm 包 `extensions/index.ts` 的
 `showWidget` 硬编码 true 且无配置机制，本地改为 `false`——Δ 文件清单默认不显示，
 `/filechanges` 会话内仍可开；状态栏槽位（有改动时的一行摘要）保留。
