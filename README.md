@@ -378,6 +378,7 @@ git --git-dir=~/.pi/agent-private.git checkout -f main  # 3. 成品覆盖本地�
 # 4. 运行时补装：cd extensions/bash-guard && npm install
 #                  cd skills-optional/pdf-reader && python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
 # 5. 验证：python3 scripts/apply-local-patches.py --check → 五补丁应全「已应用（跳过）」+ 哈希校验通过
+#          （filechanges 在 pi install 前会显示「未安装(运行时)」，属信息态、不算失败）
 #          bash scripts/check-upstream-drift.sh          → 上游列应全「未动」
 ```
 两层推送前都过密钥扫描闸门（auth.json / sessions 永不入任何一层）。

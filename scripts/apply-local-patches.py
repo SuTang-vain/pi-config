@@ -138,16 +138,23 @@ def main():
 
     # 逐条打补丁，同时按目标文件聚合状态（哈希校验必须等一个文件的补丁全到位才有意义）
     state = {}
-    totals = {"applied": 0, "skipped": 0, "pending": 0, "failed": 0}
+    totals = {"applied": 0, "skipped": 0, "pending": 0, "runtime": 0, "failed": 0}
     for p in patches:
         pid = p.get("id", "?")
         rel = p.get("file", "")
-        st = state.setdefault(rel, {"applied": 0, "skipped": 0, "pending": 0, "failed": 0})
+        st = state.setdefault(rel, {"applied": 0, "skipped": 0, "pending": 0, "runtime": 0, "failed": 0})
         fp = root / rel
         if not fp.is_file():
-            print(f"✗ {pid}: 目标不存在 {rel}（先按 README 拷上游 / npm install）")
-            st["failed"] += 1
-            totals["failed"] += 1
+            # node_modules 下的目标需先跑 npm install / pi install —— 刚接入的新机器上必然缺失，
+            # 报成失败会让人以为接入坏了。归入「运行时未安装」信息态，不计入失败。
+            if "node_modules/" in rel:
+                print(f"⏳ {pid}: 目标未安装 {rel}（运行时依赖，先跑 npm install / pi install）")
+                st["runtime"] += 1
+                totals["runtime"] += 1
+            else:
+                print(f"✗ {pid}: 目标不存在 {rel}（先按 README「借鉴组件」节拷上游）")
+                st["failed"] += 1
+                totals["failed"] += 1
             continue
         text = fp.read_text(encoding="utf-8")
         if p.get("marker") and p["marker"] in text:
@@ -180,6 +187,9 @@ def main():
         fp = root / rel
         if st is None or not fp.is_file():
             continue
+        if st["runtime"]:
+            print(f"· {rel}: 运行时未安装，未做校验（补装后重跑即可）")
+            continue
         if st["failed"]:
             print(f"· {rel}: 因目标缺失或锚点失配，未做校验")
             continue
@@ -200,7 +210,11 @@ def main():
             extra = "（与公开账本一致）" if ledger[rel] == expect else "（⚠ 与公开账本不一致，需重签账本）"
         print(f"✓ 校验通过 {rel}{extra}")
 
-    print(f"\n应用 {totals['applied']} · 跳过 {totals['skipped']} · 待应用 {totals['pending']} · 校验通过 {verified} · 失败 {failed}")
+    print(f"\n应用 {totals['applied']} · 跳过 {totals['skipped']} · 待应用 {totals['pending']} · "
+          f"未安装(运行时) {totals['runtime']} · 校验通过 {verified} · 失败 {failed}")
+    if totals["runtime"]:
+        print("注意：「未安装(运行时)」不是错误——先 cd extensions/bash-guard && npm install；"
+              "filechanges 需先 pi install 该包，补装后重跑本脚本。")
     if failed:
         print("提示：锚点失配时不要硬改——先跑 scripts/check-upstream-drift.sh 看上游是否已更新。")
     return 1 if failed else 0
