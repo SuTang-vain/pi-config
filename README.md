@@ -271,6 +271,33 @@ pi remove npm:pi-subagents && pi install npm:@maplezzk/pi-interactive-subagents
 单发往返 / 并发双开 / 人中途插话改向 / pane 自动清理 / 结果内联回流 /
 与全部 6 个 productivity 扩展共存无冲突。
 
+## 借鉴组件（来自 [amosblomqvist/pi-config](https://github.com/amosblomqvist/pi-config)）
+
+> 上游无 LICENSE，故这三个目录**不入库**（见 .gitignore），仅本地使用。
+> 需要重建时按下述命令再取；bash-guard 含本地补丁，见注释。
+
+| 组件 | 位置 | 作用 |
+|---|---|---|
+| `analyze-sessions/` | `skills/` | 会话审计：`cost.py --since 7d --by project\|model\|session\|day` 成本汇总（含子代理）、`prompts.py` 提示词挖掘、跨会话检索。stdlib 零依赖 |
+| `bash-guard/` | `extensions/` | bash 拦截双层：主会话弹 Run/Abort 对话框（git 全系/管道/重定向/rm/sudo…，60s 防重试）；子代理硬阻断灾难清单（rm -rf/sudo/mkfs/git commit 等），无 UI 时安全失败为 abort |
+| `prompt-snippets/` | `extensions/` | 一次性行为规则：`alt+s` 勾选 snippet 随消息注入，发送后自动重置。自带 verify-not-assume 等 6 条 |
+
+```bash
+# 再获取（仓库无 LICENSE，仅限个人使用；勿并入本 MIT 仓库）
+curl -sL https://github.com/amosblomqvist/pi-config/archive/refs/heads/main.tar.gz | tar xz --strip-components=1 -C /tmp/amos-src
+cp -R /tmp/amos-src/skills/analyze-sessions ~/.pi/agent/skills/
+cp -R /tmp/amos-src/extensions/bash-guard ~/.pi/agent/extensions/ && cd ~/.pi/agent/extensions/bash-guard && npm install
+cp -R /tmp/amos-src/extensions/prompt-snippets ~/.pi/agent/extensions/
+```
+
+**bash-guard 本地补丁**（上游按 `PI_SUBAGENT_DEPTH` 识别子代理，但本机两个子代理引擎
+均不注入该变量）：改为三重检测 `PI_SUBAGENT_ID`（@maplezzk pane 子代理）/
+`PI_SUBAGENT_RUNNER_CONFIG`（pi-subagents 无头 runner）/ `!stdin.isTTY`（通用无头）。
+
+**子代理加载 bash-guard 的引擎配置**（仅 interactive-subagents 分支需要；该引擎
+spawn 子进程用 `--no-extensions` + 显式白名单）：见
+`extensions/pi-interactive-subagents/config.json` 的 `subagentExtensions` 字段。
+
 ## 已移除 / 已淘汰
 
 保留此清单是为了避免重装时又把它们拿回来（每一项都记录了移除理由与恢复方式）。
