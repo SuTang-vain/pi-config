@@ -7,12 +7,7 @@
   },
   "lastChangelogVersion": "0.85.1",
   "modelThinkingLevels": {
-    "zai-coding-cn/glm-5.3": "high",
     "zai-coding-cn/glm-5.3-flash": "max",
-    "deepseek/deepseek-flash": "high",
-    "kimi-coding/k3": "high",
-    "kimi-coding/k3-256k": "high",
-    "kimi-coding/kimi-for-coding": "high",
     "kimi-coding/kimi-for-coding-highspeed": "medium"
   },
   "showCacheMissNotices": true,

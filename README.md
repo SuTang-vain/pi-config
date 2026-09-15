@@ -24,7 +24,7 @@
 |---|---|---|
 | `auth.json` | 468 B | **含明文 API 密钥。公开仓库会被爬虫分钟级抓取。绝不提交。** |
 | `sessions/` | 98 MB | 私有对话记录（日增，数字为 2026-09-15 实测） |
-| `skills/` · `skills-optional/` | 约 562 MB | 第三方技能库，可重装；体积也不适合入 git |
+| `skills/` · `skills-optional/` | 约 0.5 GB（大头是 scientific 的 git 对象） | 第三方技能库，可重装；体积也不适合入 git |
 | `npm/node_modules/` | 20 MB | 第三方包，由 `package-lock.json` 还原 |
 | `missions/` | 24 KB | 含本机绝对路径与用户名 |
 
@@ -42,21 +42,18 @@ cd ~/.pi/agent/npm && npm install
 
 ### 2. 技能
 
-三个来源，全部是第三方仓库，按需 clone 到 `~/.pi/agent/skills/`：
+四个来源（含本机二进制生成），按需取用到 `~/.pi/agent/skills/`：
 
 ```bash
 # herdr（1 个：让 pi 在 Herdr pane 内主动控制 pane/tab/workspace/其他 agent）
 # 用已装二进制自带的 release-matched 副本，比 GitHub master 更可靠：
 herdr --skill > ~/.pi/agent/skills/herdr/SKILL.md
 
-# pi-skills（保留 1 个：vscode；其余 7 个经 128 会话调用统计为零调用而排除）
+# pi-skills（保留 1 个：vscode；其余 7 个零调用排除，统计口径见「为什么只注入 8 个技能」）
 git clone https://github.com/badlogic/pi-skills ~/.pi/agent/skills/pi-skills
 
-# 其中 7 个不需要，用 sparse-checkout **永久排除**（clone 工作区保持干净，git pull 不会带回、
-# 也不产生冲突）：
-#   browser-tools    —— 与 ego-browser 能力完全重叠，却带 120 MB node_modules
-#   brave-search     —— 无 BRAVE_API_KEY，无法工作
-#   gccli/gdcli/gmcli/transcribe/youtube-transcript —— 零真实调用（128 会话实证）
+# 其中 7 个经 sparse-checkout **永久排除**（工作区干净，git pull 不带回；理由见末尾「已移除」表）：
+#   browser-tools / brave-search / gccli / gdcli / gmcli / transcribe / youtube-transcript
 cd ~/.pi/agent/skills/pi-skills
 cat > .git/info/sparse-checkout <<'SPARSE'
 /*
@@ -74,22 +71,44 @@ rm -rf browser-tools youtube-transcript   # sparse 只跳过已跟踪文件；�
 # 备注：agent-reach 曾装在 ~/.agents/skills/，因依赖 OpenCLI/twitter-cli/bili-cli
 # 三套外部后端 + 浏览器登录态而移除（见 README 末“已移除”一节）
 
-# scientific-agent-skills（163 个科研技能，MIT，v2.64.0）
-git clone https://github.com/K-Dense-AI/scientific-agent-skills ~/.pi/agent/skills-optional/scientific-agent-skills
+# scientific-agent-skills（MIT，v2.64.0，上游 160+ 技能）——partial clone + sparse
+# 两坑警告：① 非 cone 模式 ! 是「排除」，!/skills/技能名 会把要留的删掉（先 !/skills/*
+#   再 /skills/<name>/ 白名单回来）；② --depth 1 不减 .git（tip 提交引用全部 blob），
+#   必须 --filter=blob:none 才按需取
+git clone --depth 1 --filter=blob:none --no-checkout \
+  https://github.com/K-Dense-AI/scientific-agent-skills \
+  ~/.pi/agent/skills-optional/scientific-agent-skills
+cd ~/.pi/agent/skills-optional/scientific-agent-skills
+git sparse-checkout init --no-cone
+cat > .git/info/sparse-checkout <<'SPARSE'
+/*
+!/skills/*
+/skills/exa-search/
+/skills/pi-agent/
+/skills/literature-review/
+/skills/paper-lookup/
+/skills/pyhealth/
+/skills/hypothesis-generation/
+/skills/database-lookup/
+/skills/scikit-learn/
+SPARSE
+git checkout main
+# 上例白名单 4 项常驻 + 4 项按需（--skill 时 blob 按需拉取，磁盘即时生效）
 
 # ego-browser（浏览器自动化，经 skill 管理器安装，带 commit 哈希锁）
 # 见 https://github.com/citrolabs/ego-lite
 ```
 
-**注意**：`settings.json` 里的 `skills` 白名单是 **8 个绝对路径**，指向
+**注意**：`settings.json` 里的 `skills` 白名单（当前 **4** 项，见下方清单）指向
 `~/.pi/agent/skills-optional/scientific-agent-skills/skills/<name>/SKILL.md`。
-换机器或换用户名后需要同步修改。
+换机器或换用户名后需同步修改（含 sparse 白名单同步）。
 
-#### 为什么只白名单 8 个？
+#### 为什么只注入 8 个技能？
 
-`skills-optional/` 里有 163 个科研技能，但历史使用统计显示实际只用到 8 个。
+`skills-optional/` 上游有 160+ 个科研技能（统计口径：128 个会话的调用记录，
+2026-09-15 实测，下同），实际高频仅 4 个。
 pi 会把**所有**已发现技能的 name + description 注入系统提示——全量时约
-**19,300 tokens/会话**，收敛后降到约 **1,370 tokens**（省 93%）。
+**19,300 tokens/会话**；当前 8 技能（白名单 4 + 自动扫描 4）约 **3.7k 字符**。
 
 省下的钱不多（约 $0.024/会话），真正的收益是上下文空间与注意力不被稀释：
 163 个化学、量子、实验室自动化技能与日常编码无关。
@@ -105,11 +124,9 @@ pi 会把**所有**已发现技能的 name + description 注入系统提示—�
              : analyze-sessions（skills/，amos 借鉴件）
              : vscode（pi-skills，唯一保留项）
 
-按需挂载 4 个 : pyhealth · hypothesis-generation · database-lookup · scikit-learn
-            （零调用转按需，128 会话实证；用法见下方 --skill 示例）
 ```
 
-> 零调用淘汰记录（128 个会话的调用统计实证）：sg-data-pack、gccli、gdcli、
+> 零调用淘汰记录（统计口径见上节）：sg-data-pack、gccli、gdcli、
 > gmcli、transcribe、youtube-transcript 六项从未被真实调用，已移出扫描路径
 > （见末尾「已移除」清单）。pyhealth / hypothesis-generation / scikit-learn /
 > database-lookup 四项零调用，2026-09-15 转按需挂载（见上）。
@@ -127,10 +144,6 @@ pi --skill ~/.pi/agent/skills-optional/scientific-agent-skills/skills/qutip/SKIL
 | 发现候选 URL | `exa-search` 技能 | 写文件 → 只取 `title+url`（~215 tok），结构化 JSON 可筛 |
 | URL → 净正文 | `exa_extract.py`（同技能自带） | 走 Exa `/contents`，支持批量，无需浏览器 |
 | 读透真实页面 | `ego-browser` | JS 重、登录墙、需点击的场景 |
-
-已移除的重叠项：`pi-web-access`（Exa 部分与 exa-search 重复，+810 tok/会话）、
-`brave-search`（无密钥）、`browser-tools`（120 MB，与 ego-browser 全面重叠）、
-`agent-reach`（依赖三套外部后端）。
 
 > ⚠️ 用 `exa-search` 时注意：`/answer` 与 `/search` 是两个端点。
 > 不传 `numResults` 才走 `/answer`（Exa 便宜 40% 且返回紧凑合成答案）；
@@ -157,7 +170,7 @@ herdr integration status          # 验证
 
 只装集成时，Herdr 看得见 pi，但 pi 用不上 Herdr。
 
-它会向 Herdr 的本地 Unix socket 上报 agent 状态（`idle` / `working` / `blocked`）。
+它会向 Herdr 的本地 Unix socket 上报 agent 状态。
 权限画像：仅 `import net`，零子进程、零网络、零文件读写，且以 `HERDR_ENV=1`
 为门控——不在 Herdr 内运行时完全惰性。
 
@@ -257,7 +270,7 @@ cp -R /tmp/amos-src/extensions/prompt-snippets ~/.pi/agent/extensions/
 cp /tmp/amos-src/deprecated/extensions/context.ts ~/.pi/agent/extensions/
 cp /tmp/amos-src/deprecated/extensions/md-link.ts ~/.pi/agent/extensions/
 cp -R /tmp/amos-src/skills/pdf-reader ~/.pi/agent/skills-optional/ && cd ~/.pi/agent/skills-optional/pdf-reader && python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
-# bash-guard 需重打本地补丁（三重子代理检测，见上表说明）
+# bash-guard 需重打本地补丁①②（见下方「bash-guard 本地补丁」说明）
 ```
 
 **bash-guard 本地补丁**（上游按 `PI_SUBAGENT_DEPTH` 识别子代理，但本机两个子代理引擎
@@ -286,8 +299,8 @@ spawn 子进程用 `--no-extensions` + 显式白名单）：见
 | `@jackwener/opencli` (npm -g) | 29 MB + 228 KB + 14 MB 常驻守护 | 仅 agent-reach 使用；agent-reach 移除后成为孤儿 | `npm i -g @jackwener/opencli` |
 | `minimax-cn` provider | 3 个死条目 | 无 API 密钥，选中即报错 | 编辑 `models-store.json` |
 | `moonshotai-cn` provider | 4 个死条目 | 无 API 密钥（Kimi 模型由 kimi-coding 网关正常提供），选中即报错 | 编辑 `models-store.json` |
-| `sg-data-pack` 技能 | 符号链接 | 128 会话统计零调用；真身在 `~/.zcode/skills/`（zcode 自用），不受影响 | `ln -s ~/.zcode/skills/sg-data-pack ~/.agents/skills/sg-data-pack` |
-| `gccli`/`gdcli`/`gmcli`/`transcribe`/`youtube-transcript` 技能 | 各 4–108 KB | 128 会话统计零真实调用（历史"调用"均为 ls 列表误配） | 改 pi-skills sparse 规则；youtube-transcript 恢复后需 `npm install` |
+| `sg-data-pack` 技能 | 符号链接 | 零调用（口径见技能节）；真身在 `~/.zcode/skills/`（zcode 自用），不受影响 | `ln -s ~/.zcode/skills/sg-data-pack ~/.agents/skills/sg-data-pack` |
+| `gccli`/`gdcli`/`gmcli`/`transcribe`/`youtube-transcript` 技能 | 各 4–108 KB | 零真实调用（口径见技能节）（历史"调用"均为 ls 列表误配） | 改 pi-skills sparse 规则；youtube-transcript 恢复后需 `npm install` |
 | `~/.hermes`（Hermes Agent 2.7 GB） | 2.7 GB | 框架休眠 2 个月；曾**藏有系统默认 node**，换血到 `/opt/homebrew/bin/node` v26 后整体删除 | 重跑 upstream 安装器；数据备份在 `~/Backups/hermes/` |
 
 > 注：`~/.hermes`（2.7 GB，Hermes Agent v0.17.0）曾是一套独立框架，但其 `node/`
