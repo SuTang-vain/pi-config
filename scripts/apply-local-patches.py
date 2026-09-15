@@ -1,37 +1,210 @@
 #!/usr/bin/env python3
-"""本地补丁应用器：对上游拷贝重放我们的定制（幂等，可执行文档）。
+"""本地补丁应用器 —— 从上游拷贝重建我们的定制（幂等，可重放）。
+
+用途：新机器按「借鉴组件」节拷来**上游原版**后，用本脚本把本机定制层打回去；
+校验每个目标的最终 sha256 是否等于私有层记录的值。日常不需要跑——
+私有层（pi-config-private）里存的是**已打好补丁的成品**，checkout 即得。
+
+为什么补丁正文不在这里：
+  上游 amosblomqvist/pi-config 无 LICENSE，正文必须逐字等于上游才能锚定替换，
+  内嵌即等于在公开仓库再分发上游源码。故正文存放在私密层的
+  `.pi-private/local-patches.json`，公开侧只留 patch id / 目标文件 / 目标
+  sha256 / 人类可读描述 —— 重建能力不丢，正文不外泄。
+
+补丁正文来源（按序探测，前者优先）：
+  1. --patches <path>
+  2. $PI_LOCAL_PATCHES
+  3. <agentDir>/.pi-private/local-patches.json      ← 双层仓库的标准位置
+  4. ~/.pi-config-private/.pi-private/local-patches.json   ← 独立 clone 的备选
+  5. ~/pi-config-private/.pi-private/local-patches.json
+缺失时会打印获取命令，不会静默跳过。
 
 用法：
-  python3 tools/apply-local-patches.py            # 应用全部（已应用则跳过）
-  python3 tools/apply-local-patches.py --check    # 只报告状态
+  python3 scripts/apply-local-patches.py              # 应用（已应用则跳过）并校验哈希
+  python3 scripts/apply-local-patches.py --check      # 只报告状态，不写文件
+  python3 scripts/apply-local-patches.py --list       # 列出补丁清单（含描述）
+  python3 scripts/apply-local-patches.py --root /tmp/x   # 在别的树里演练（沙箱）
 
-补丁对（base64 内嵌，锚点取自上游真身 @ 2026-09-15）：
-  bash-guard：P6 行内选择器大区段（含选项标签）→ P1 三重子代理检测
-              → P3 命令截断 120 → P4 主会话仅拦 HIGH
-  filechanges：FC3 widget 默认关
-新机器流程：按 README「借鉴组件」重拷上游 → pi install filechanges →
-跑本脚本 → 五补丁全部"已应用"即与主力机同态。
-锚点失配 = 上游已更新 → 按 README「本地补丁」各节人工重做。
+退出码：0 = 全部到位且校验通过 · 1 = 有失败（缺目标/锚点失配/哈希不符）· 2 = 用法或环境错误
 """
-import base64, json, pathlib, sys
+import argparse
+import hashlib
+import json
+import os
+import pathlib
+import sys
 
-AGENT = pathlib.Path(__file__).resolve().parent.parent
-PATCHES = json.loads(base64.b64decode("W3siaWQiOiAiUDYtaW5saW5lLXNlbGVjdG9yIiwgImZpbGUiOiAiZXh0ZW5zaW9ucy9iYXNoLWd1YXJkL2luZGV4LnRzIiwgImZpbmQiOiAiXHRjb25zdCBpdGVtczogU2VsZWN0SXRlbVtdID0gW1xuXHRcdHsgdmFsdWU6IFwicnVuXCIsIGxhYmVsOiBcIlJ1blwiLCBkZXNjcmlwdGlvbjogXCJFeGVjdXRlIHRoZSBjb21tYW5kXCIgfSxcblx0XHR7IHZhbHVlOiBcImFib3J0XCIsIGxhYmVsOiBcIkFib3J0XCIsIGRlc2NyaXB0aW9uOiBcIkJsb2NrIHRoaXMgY29tbWFuZFwiIH0sXG5cdF07XG5cblx0Y29uc3QgY2hvaWNlID0gYXdhaXQgY3R4LnVpLmN1c3RvbTxcInJ1blwiIHwgXCJhYm9ydFwiPigodHVpLCB0aGVtZSwgX2tiLCBkb25lKSA9PiB7XG5cdFx0Y29uc3QgY29udGFpbmVyID0gbmV3IENvbnRhaW5lcigpO1xuXHRcdGNvbnRhaW5lci5hZGRDaGlsZChuZXcgRHluYW1pY0JvcmRlcigoczogc3RyaW5nKSA9PiB0aGVtZS5mZyhcIndhcm5pbmdcIiwgcykpKTtcblx0XHRjb250YWluZXIuYWRkQ2hpbGQobmV3IFRleHQodGhlbWUuZmcoXCJ3YXJuaW5nXCIsIHRoZW1lLmJvbGQoXCJQb3RlbnRpYWxseSBkZXN0cnVjdGl2ZSBiYXNoIGNvbW1hbmRcIikpLCAxLCAwKSk7XG5cdFx0Y29udGFpbmVyLmFkZENoaWxkKG5ldyBUZXh0KGJvZHksIDEsIDApKTtcblxuXHRcdGNvbnN0IGxpc3QgPSBuZXcgU2VsZWN0TGlzdChpdGVtcywgaXRlbXMubGVuZ3RoLCB7XG5cdFx0XHRzZWxlY3RlZFByZWZpeDogKHQpID0+IHRoZW1lLmZnKFwiYWNjZW50XCIsIHQpLFxuXHRcdFx0c2VsZWN0ZWRUZXh0OiAodCkgPT4gdGhlbWUuZmcoXCJhY2NlbnRcIiwgdCksXG5cdFx0XHRkZXNjcmlwdGlvbjogKHQpID0+IHRoZW1lLmZnKFwibXV0ZWRcIiwgdCksXG5cdFx0XHRzY3JvbGxJbmZvOiAodCkgPT4gdGhlbWUuZmcoXCJkaW1cIiwgdCksXG5cdFx0XHRub01hdGNoOiAodCkgPT4gdGhlbWUuZmcoXCJ3YXJuaW5nXCIsIHQpLFxuXHRcdH0pO1xuXG5cdFx0bGlzdC5vblNlbGVjdCA9IChpdGVtKSA9PiBkb25lKGl0ZW0udmFsdWUgYXMgXCJydW5cIiB8IFwiYWJvcnRcIik7XG5cdFx0bGlzdC5vbkNhbmNlbCA9ICgpID0+IGRvbmUoXCJhYm9ydFwiKTtcblx0XHRjb250YWluZXIuYWRkQ2hpbGQobGlzdCk7XG5cblx0XHRjb250YWluZXIuYWRkQ2hpbGQobmV3IER5bmFtaWNCb3JkZXIoKHM6IHN0cmluZykgPT4gdGhlbWUuZmcoXCJ3YXJuaW5nXCIsIHMpKSk7XG5cblx0XHRyZXR1cm4ge1xuXHRcdFx0cmVuZGVyOiAodykgPT4gY29udGFpbmVyLnJlbmRlcih3KSxcblx0XHRcdGludmFsaWRhdGU6ICgpID0+IGNvbnRhaW5lci5pbnZhbGlkYXRlKCksXG5cdFx0XHRoYW5kbGVJbnB1dDogKGRhdGEpID0+IHtcblx0XHRcdFx0bGlzdC5oYW5kbGVJbnB1dChkYXRhKTtcblx0XHRcdFx0dHVpLnJlcXVlc3RSZW5kZXIoKTtcblx0XHRcdH0sXG5cdFx0fTtcblx0fSwgeyBvdmVybGF5OiB0cnVlIH0pO1xuXG5cdHJldHVybiBjaG9pY2UgPz8gXCJhYm9ydFwiOyIsICJyZXBsYWNlIjogIlx0Y29uc3QgaXRlbXM6IFNlbGVjdEl0ZW1bXSA9IFtcblx0XHR7IHZhbHVlOiBcInJ1blwiLCBsYWJlbDogXCJSdW4g4o+OXCIsIGRlc2NyaXB0aW9uOiBcIkV4ZWN1dGUgdGhlIGNvbW1hbmQgYXMtaXNcIiB9LFxuXHRcdHsgdmFsdWU6IFwiYWJvcnRcIiwgbGFiZWw6IFwiQWJvcnQg4pyVXCIsIGRlc2NyaXB0aW9uOiBcIkJsb2NrIGl0IGFuZCB0ZWxsIHRoZSBhZ2VudCB3aHlcIiB9LFxuXHRdO1xuXG5cdC8vIExvY2FsIHBhdGNoIDY6IGlubGluZSBzZWxlY3RvciBhdCB0aGUgZWRpdG9yIHBvc2l0aW9uIChyZXBsYWNlcyB0aGUgaW5wdXRcblx0Ly8gZWRpdG9yIHVudGlsIGRvbmUg4oCUIG5vIGZsb2F0aW5nIG92ZXJsYXkpLCBob3Jpem9udGFsIFJ1bnxBYm9ydCwgYXJyb3cga2V5cy5cblx0Y29uc3QgY2hvaWNlID0gYXdhaXQgY3R4LnVpLmN1c3RvbTxcInJ1blwiIHwgXCJhYm9ydFwiPigodHVpOiBhbnksIHRoZW1lOiBhbnksIF9rYjogYW55LCBkb25lOiAodjogXCJydW5cIiB8IFwiYWJvcnRcIikgPT4gdm9pZCkgPT4ge1xuXHRcdGxldCBzZWwgPSAwOyAvLyAwID0gcnVuLCAxID0gYWJvcnRcblx0XHRyZXR1cm4ge1xuXHRcdFx0cmVuZGVyOiAoX3c6IG51bWJlcikgPT4ge1xuXHRcdFx0XHRjb25zdCB0aXRsZSA9IHRoZW1lLmZnKFwid2FybmluZ1wiLCB0aGVtZS5ib2xkKFwiIFBvdGVudGlhbGx5IGRlc3RydWN0aXZlIChcIiArIHJpc2suc2V2ZXJpdHkudG9VcHBlckNhc2UoKSArIFwiKVwiKSkgK1xuXHRcdFx0XHRcdHRoZW1lLmZnKFwibXV0ZWRcIiwgXCIgIFwiICsgcmVhc29uc1RleHQpO1xuXHRcdFx0XHRjb25zdCBjbWQgPSB0aGVtZS5mZyhcImRpbVwiLCBcIiBcIiArIGNtZERpc3BsYXkpO1xuXHRcdFx0XHRjb25zdCBvcHQgPSAoaTogbnVtYmVyLCBzOiBzdHJpbmcpID0+XG5cdFx0XHRcdFx0aSA9PT0gc2VsID8gdGhlbWUuZmcoXCJhY2NlbnRcIiwgdGhlbWUuYm9sZChcIuKdryBcIiArIHMpKSA6IHRoZW1lLmZnKFwibXV0ZWRcIiwgXCIgIFwiICsgcyk7XG5cdFx0XHRcdGNvbnN0IG9wdHMgPSBvcHQoMCwgXCJSdW4g4o+OIGV4ZWN1dGVzIGFzLWlzXCIpICsgdGhlbWUuZmcoXCJkaW1cIiwgXCIgICDilIIgICBcIikgKyBvcHQoMSwgXCJBYm9ydCDinJUgYmxvY2tzICYgdGVsbHMgYWdlbnRcIik7XG5cdFx0XHRcdGNvbnN0IGhpbnQgPSB0aGVtZS5mZyhcImRpbVwiLCBcIiDihpAv4oaSIChvciDihpHihpMpIHN3aXRjaCDCtyDij44gY29uZmlybSDCtyBlc2MgPSBhYm9ydFwiKTtcblx0XHRcdFx0cmV0dXJuIFt0aXRsZSwgY21kLCBvcHRzLCBoaW50XTtcblx0XHRcdH0sXG5cdFx0XHRpbnZhbGlkYXRlOiAoKSA9PiB7fSxcblx0XHRcdGhhbmRsZUlucHV0OiAoZGF0YTogdW5rbm93bikgPT4ge1xuXHRcdFx0XHQvLyBLZXlzIGFycml2ZSByYXcuIEFycm93cyBtYXkgYmUgcGxhaW4gQ1NJIChcXHgxYltEKSwgU1MzIChcXHgxYk9EKSxcblx0XHRcdFx0Ly8gb3Iga2l0dHktcHJvdG9jb2wgcGFyYW1ldGVyaXplZCAoXFx4MWJbMTsxOjFDKSDigJQgdGhlIGZpbmFsIGxldHRlclxuXHRcdFx0XHQvLyBBL0IvQy9EIGNhcnJpZXMgdGhlIGRpcmVjdGlvbiBpbiBhbGwgZm9ybXM7IHBpLXR1aSBuYW1lcyBhbHNvIGFjY2VwdGVkLlxuXHRcdFx0XHRjb25zdCBzID0gdHlwZW9mIGRhdGEgPT09IFwic3RyaW5nXCIgPyBkYXRhIDogU3RyaW5nKGRhdGEgPz8gXCJcIik7XG5cdFx0XHRcdGNvbnN0IG0gPSBzLm1hdGNoKC9eXFx4MWJcXFtbMC05OzpdKihbQUJDRF0pJC8pIHx8IHMubWF0Y2goL15cXHgxYk8oW0FCQ0RdKSQvKTtcblx0XHRcdFx0Y29uc3QgZGlyID0gbSA/IG1bMV0gOiBzO1xuXHRcdFx0XHRpZiAoZGlyID09PSBcIkRcIiB8fCBkaXIgPT09IFwiQVwiIHx8IGRpciA9PT0gXCJsZWZ0XCIgfHwgZGlyID09PSBcInVwXCIpIHNlbCA9IDA7XG5cdFx0XHRcdGVsc2UgaWYgKGRpciA9PT0gXCJDXCIgfHwgZGlyID09PSBcIkJcIiB8fCBkaXIgPT09IFwicmlnaHRcIiB8fCBkaXIgPT09IFwiZG93blwiKSBzZWwgPSAxO1xuXHRcdFx0XHRlbHNlIGlmIChzID09PSBcIlxcclwiIHx8IHMgPT09IFwiXFxuXCIpIGRvbmUoc2VsID09PSAwID8gXCJydW5cIiA6IFwiYWJvcnRcIik7XG5cdFx0XHRcdGVsc2UgaWYgKHMgPT09IFwiXFx4MWJcIiB8fCBzID09PSBcImVzY2FwZVwiKSBkb25lKFwiYWJvcnRcIik7XG5cdFx0XHRcdHR1aS5yZXF1ZXN0UmVuZGVyKCk7XG5cdFx0XHR9LFxuXHRcdH07XG5cdH0pO1xuXG5cdHJldHVybiBjaG9pY2UgPz8gXCJhYm9ydFwiOyIsICJtYXJrZXIiOiAiTG9jYWwgcGF0Y2ggNiJ9LCB7ImlkIjogIlAxLXN1YmFnZW50LWRldGVjdCIsICJmaWxlIjogImV4dGVuc2lvbnMvYmFzaC1ndWFyZC9pbmRleC50cyIsICJmaW5kIjogIi8vIFBJX1NVQkFHRU5UX0RFUFRIIGlzIDAgKG9yIHVuc2V0KSBpbiB0aGUgbWFpbiBzZXNzaW9uIGFuZCA+PSAxIGluIHNwYXduZWQgc3ViYWdlbnQgcHJvY2Vzc2VzLlxuLy8gQmVoYXZpb3VyIGJyYW5jaGVzIG9uIHRoaXM6IGludGVyYWN0aXZlIHByb21wdGluZyBpbiB0aGUgbWFpbiBzZXNzaW9uLCBoZWFkbGVzcyBoYXJkLWJsb2NrXG4vLyBmb3IgY2F0YXN0cm9waGljIG9wZXJhdGlvbnMgaW4gc3ViYWdlbnRzICh3aGVyZSBzdGRpbiBpcyAvZGV2L251bGwgYW5kIG5vIFVJIGlzIGF2YWlsYWJsZSkuXG5jb25zdCBfc3ViYWdlbnREZXB0aCA9IE51bWJlcihwcm9jZXNzLmVudi5QSV9TVUJBR0VOVF9ERVBUSCA/PyBcIjBcIik7XG5jb25zdCBfaXNTdWJhZ2VudCA9IE51bWJlci5pc0Zpbml0ZShfc3ViYWdlbnREZXB0aCkgJiYgX3N1YmFnZW50RGVwdGggPj0gMTtcbiIsICJyZXBsYWNlIjogIi8vIFBJX1NVQkFHRU5UX0RFUFRIIGlzIDAgKG9yIHVuc2V0KSBpbiB0aGUgbWFpbiBzZXNzaW9uIGFuZCA+PSAxIGluIHNwYXduZWQgc3ViYWdlbnQgcHJvY2Vzc2VzLlxuLy8gQmVoYXZpb3VyIGJyYW5jaGVzIG9uIHRoaXM6IGludGVyYWN0aXZlIHByb21wdGluZyBpbiB0aGUgbWFpbiBzZXNzaW9uLCBoZWFkbGVzcyBoYXJkLWJsb2NrXG4vLyBmb3IgY2F0YXN0cm9waGljIG9wZXJhdGlvbnMgaW4gc3ViYWdlbnRzICh3aGVyZSBzdGRpbiBpcyAvZGV2L251bGwgYW5kIG5vIFVJIGlzIGF2YWlsYWJsZSkuXG4vL1xuLy8gTG9jYWwgcGF0Y2ggKHVubGljZW5zZWQgdXBzdHJlYW0ga2VwdCBvdXQgb2YgZ2l0KTpcbi8vICAgVGhlIHR3byBzdWJhZ2VudCBlbmdpbmVzIG9uIHRoaXMgbWFjaGluZSBkbyBub3QgaW5qZWN0IFBJX1NVQkFHRU5UX0RFUFRIXG4vLyAgIChuaWNvYmFpbG9uL3BpLXN1YmFnZW50cyBhbmQgQG1hcGxlenprL3BpLWludGVyYWN0aXZlLXN1YmFnZW50cyksIHNvIGRldGVjdFxuLy8gICBjaGlsZHJlbiB2aWEgdGhlaXIgb3duIG1hcmtlcnMgaW5zdGVhZDpcbi8vICAgICAtIFBJX1NVQkFHRU5UX0lEICAgICAgICAgICAg4oaSIEBtYXBsZXp6ayBwYW5lIGNoaWxkcmVuICh0aGV5IGhhdmUgYSBUVFkpXG4vLyAgICAgLSBQSV9TVUJBR0VOVF9SVU5ORVJfQ09ORklHIOKGkiBuaWNvYmFpbG9uIGhlYWRsZXNzIHJ1bm5lciBjaGlsZHJlblxuLy8gICAgIC0gIXByb2Nlc3Muc3RkaW4uaXNUVFkgICAgICDihpIgYW55IGhlYWRsZXNzIHBpIChjb3ZlcnMgcGkgLXA7IGhhcmQtYmxvY2sgbGlzdCBvbmx5LFxuLy8gICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIG92ZXJyaWRlIHdpdGggLS1iYXNoLWd1YXJkLWF1dG8tYWxsb3cpXG5jb25zdCBfc3ViYWdlbnREZXB0aCA9IE51bWJlcihcblx0cHJvY2Vzcy5lbnYuUElfU1VCQUdFTlRfREVQVEggPz9cblx0XHQocHJvY2Vzcy5lbnYuUElfU1VCQUdFTlRfSUQgIT09IHVuZGVmaW5lZCB8fFxuXHRcdFx0cHJvY2Vzcy5lbnYuUElfU1VCQUdFTlRfUlVOTkVSX0NPTkZJRyAhPT0gdW5kZWZpbmVkIHx8XG5cdFx0IXByb2Nlc3Muc3RkaW4uaXNUVFlcblx0XHRcdD8gXCIxXCJcblx0XHRcdDogXCIwXCIpLFxuKTtcbmNvbnN0IF9pc1N1YmFnZW50ID0gTnVtYmVyLmlzRmluaXRlKF9zdWJhZ2VudERlcHRoKSAmJiBfc3ViYWdlbnREZXB0aCA+PSAxO1xuIiwgIm1hcmtlciI6ICJQSV9TVUJBR0VOVF9JRCAhPT0gdW5kZWZpbmVkIn0sIHsiaWQiOiAiUDMtY21kLXRydW5jYXRlIiwgImZpbGUiOiAiZXh0ZW5zaW9ucy9iYXNoLWd1YXJkL2luZGV4LnRzIiwgImZpbmQiOiAiXHRjb25zdCBib2R5ID0gYCR7aGVhZGVyfVxcblxcbiR7cmVhc29uc1RleHR9XFxuXFxuQ29tbWFuZDpcXG4ke2NvbW1hbmR9YDsiLCAicmVwbGFjZSI6ICJcdC8vIExvY2FsIHBhdGNoOiBjYXAgdGhlIGRpc3BsYXllZCBjb21tYW5kIHNvIGRpYWxvZyBoZWlnaHQgc3RheXMgc3RhYmxlXG5cdC8vIChsb25nIGNvbW1hbmRzIG1hZGUgdGhlIGNlbnRlcmVkIG92ZXJsYXkgZHJpZnQgYmV0d2VlbiBpbnZvY2F0aW9ucykuXG5cdGNvbnN0IGNtZERpc3BsYXkgPSBjb21tYW5kLmxlbmd0aCA+IDEyMCA/IGNvbW1hbmQuc2xpY2UoMCwgMTE3KSArIFwi4oCmXCIgOiBjb21tYW5kO1xuXHRjb25zdCBib2R5ID0gYCR7aGVhZGVyfVxcblxcbiR7cmVhc29uc1RleHR9XFxuXFxuQ29tbWFuZDpcXG4ke2NtZERpc3BsYXl9YDsiLCAibWFya2VyIjogImNvbW1hbmQubGVuZ3RoID4gMTIwIn0sIHsiaWQiOiAiUDQtaGlnaC1vbmx5LWdhdGUiLCAiZmlsZSI6ICJleHRlbnNpb25zL2Jhc2gtZ3VhcmQvaW5kZXgudHMiLCAiZmluZCI6ICJcdFx0Y29uc3QgY2hvaWNlID0gYXdhaXQgcHJvbXB0UnVuT3JBYm9ydChjdHgsIGNvbW1hbmQsIHJpc2spO1xuIiwgInJlcGxhY2UiOiAiXHRcdC8vIExvY2FsIHBhdGNoIOKRoyAodXNlci1kaXJlY3RlZCk6IG1haW4tc2Vzc2lvbiBwcm9tcHRzIG9ubHkgZm9yIEhJR0ggc2V2ZXJpdHkuXG5cdFx0Ly8gTUVESVVNIChwbGFpbiBnaXQgc3RhdHVzL2RpZmYvbG9nLCBwaXBlcywgcmVkaXJlY3Rpb25zLCBtdiAtZiwg4oCmKSBwYXNzZXNcblx0XHQvLyB0aHJvdWdoIHNpbGVudGx5OyBISUdIIChzdWRvIC8gcm0gLXIqIC8gZ2l0IHJtfGNsZWFuIC1mfHJlc2V0IC0taGFyZHxcblx0XHQvLyBwdXNoIC0tZm9yY2UgLyBjdXJsfHNoIC8gZGlzayB0b29scykgc3RpbGwgc2hvd3MgdGhlIFJ1bi9BYm9ydCBkaWFsb2cuXG5cdFx0Ly8gSGVhZGxlc3MgKG5vIFVJKSBiZWhhdmlvciBpcyB1bmNoYW5nZWQ6IEhJR0ggc3RpbGwgYWJvcnRzIHZpYSBwcm9tcHRSdW5PckFib3J0LlxuXHRcdGlmIChyaXNrLnNldmVyaXR5ICE9PSBcImhpZ2hcIikgcmV0dXJuO1xuXG5cdFx0Y29uc3QgY2hvaWNlID0gYXdhaXQgcHJvbXB0UnVuT3JBYm9ydChjdHgsIGNvbW1hbmQsIHJpc2spO1xuIiwgIm1hcmtlciI6ICJyaXNrLnNldmVyaXR5ICE9PSBcImhpZ2hcIiJ9LCB7ImlkIjogIkZDMy13aWRnZXQtb2ZmIiwgImZpbGUiOiAibnBtL25vZGVfbW9kdWxlcy9Aam9obm55d3UvcGktZmlsZWNoYW5nZXMvZXh0ZW5zaW9ucy9pbmRleC50cyIsICJmaW5kIjogIiAgbGV0IHNob3dXaWRnZXQgPSB0cnVlO1xuIiwgInJlcGxhY2UiOiAiICAvLyBMb2NhbCBwYXRjaDogd2lkZ2V0IE9GRiBieSBkZWZhdWx0IChzdGF0dXMtYmFyIHNsb3QgdW5hZmZlY3RlZDsgdG9nZ2xlcyB2aWEgL2ZpbGVjaGFuZ2VzIHBlcnNpc3QgcGVyIHNlc3Npb24gb25seSkuXG4gIGxldCBzaG93V2lkZ2V0ID0gZmFsc2U7XG4iLCAibWFya2VyIjogInNob3dXaWRnZXQgPSBmYWxzZSJ9XQ=="))
+SCRIPT = pathlib.Path(__file__).resolve()
+AGENT = SCRIPT.parent.parent
+LEDGER = AGENT / "scripts" / "upstream-snapshot.json"
 
-check = "--check" in sys.argv
-applied = skipped = failed = 0
-for p in PATCHES:
-    fp = AGENT / p["file"]
-    if not fp.exists():
-        print(f"✗ {p['id']}: 目标不存在 {p['file']}"); failed += 1; continue
-    t = fp.read_text(encoding="utf-8")
-    if p["marker"] in t:
-        print(f"✓ {p['id']}: 已应用（跳过）"); skipped += 1; continue
-    if p["find"] not in t:
-        print(f"✗ {p['id']}: 上游锚点失配（上游可能已更新，需人工重做）"); failed += 1; continue
-    if check:
-        print(f"? {p['id']}: 待应用"); continue
-    fp.write_text(t.replace(p["find"], p["replace"], 1), encoding="utf-8")
-    print(f"✓ {p['id']}: 已应用"); applied += 1
-print(f"\n应用 {applied} · 跳过 {skipped} · 失败 {failed}")
-sys.exit(1 if failed else 0)
+PRIVATE_REPO = "https://github.com/SuTang-vain/pi-config-private.git"
+
+
+def die(msg, code=2):
+    print(f"错误：{msg}", file=sys.stderr)
+    sys.exit(code)
+
+
+def sha256(path):
+    h = hashlib.sha256()
+    with open(path, "rb") as fh:
+        for chunk in iter(lambda: fh.read(1 << 16), b""):
+            h.update(chunk)
+    return h.hexdigest()
+
+
+def find_patches(explicit):
+    """显式指定的路径不参与回退：给了却不存在就直接报错，避免静默用了别处的旧正文。"""
+    if explicit:
+        p = pathlib.Path(explicit).expanduser()
+        if not p.is_file():
+            die(f"--patches 指定的文件不存在：{p}")
+        return p, [p]
+    env = os.environ.get("PI_LOCAL_PATCHES")
+    if env:
+        p = pathlib.Path(env).expanduser()
+        if not p.is_file():
+            die(f"$PI_LOCAL_PATCHES 指定的文件不存在：{p}")
+        return p, [p]
+    candidates = [
+        AGENT / ".pi-private" / "local-patches.json",
+        pathlib.Path.home() / ".pi-config-private" / ".pi-private" / "local-patches.json",
+        pathlib.Path.home() / "pi-config-private" / ".pi-private" / "local-patches.json",
+    ]
+    for c in candidates:
+        if c.is_file():
+            return c, candidates
+    return None, candidates
+
+
+def load_ledger_hashes():
+    """从公开账本取「本机定制后」的权威 sha256；缺失不影响运行（仅少一道交叉校验）。"""
+    try:
+        doc = json.loads(LEDGER.read_text(encoding="utf-8"))
+    except Exception:
+        return {}
+    out = {}
+    for c in doc.get("components", []) or []:
+        if c.get("patched") and c.get("local_sha256"):
+            out[c.get("local_path")] = c["local_sha256"]
+    return out
+
+
+def main():
+    ap = argparse.ArgumentParser(
+        description="从上游重放本机定制补丁（幂等 + sha256 校验）",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    ap.add_argument("--check", action="store_true", help="只报告状态，不写文件")
+    ap.add_argument("--list", action="store_true", help="列出补丁清单后退出")
+    ap.add_argument("--root", default=str(AGENT), help="目标树根（默认 agent 目录；可用于沙箱演练）")
+    ap.add_argument("--patches", default=None, help="直接指定 local-patches.json")
+    args = ap.parse_args()
+
+    patches_path, candidates = find_patches(args.patches)
+    if patches_path is None:
+        print("找不到补丁正文（local-patches.json）。已探测：", file=sys.stderr)
+        for c in candidates:
+            print(f"  - {c}", file=sys.stderr)
+        print("\n私密层需要先接入（标准做法：独立 git-dir + 共享工作树）：", file=sys.stderr)
+        print(f"  git clone --bare {PRIVATE_REPO} ~/.pi/agent-private.git", file=sys.stderr)
+        print("  git --git-dir=~/.pi/agent-private.git config core.worktree ~/.pi/agent", file=sys.stderr)
+        print("  git --git-dir=~/.pi/agent-private.git config --bool core.bare false", file=sys.stderr)
+        print("  git --git-dir=~/.pi/agent-private.git checkout -f main", file=sys.stderr)
+        return 2
+
+    try:
+        doc = json.loads(patches_path.read_text(encoding="utf-8"))
+    except Exception as exc:
+        die(f"补丁文件无法解析：{patches_path}（{exc}）")
+
+    patches = doc.get("patches") or []
+    targets = {t.get("file"): t.get("sha256_after") for t in (doc.get("targets") or [])}
+    if not patches:
+        die(f"补丁文件里没有 patches 条目：{patches_path}")
+
+    root = pathlib.Path(args.root).expanduser().resolve()
+    print(f"补丁正文: {patches_path}")
+    print(f"目标树  : {root}")
+    print(f"补丁数  : {len(patches)}\n")
+
+    if args.list:
+        for p in patches:
+            print(f"  {p.get('id'):24} {p.get('file')}")
+            if p.get("desc"):
+                print(f"      {p['desc']}")
+        return 0
+
+    # 逐条打补丁，同时按目标文件聚合状态（哈希校验必须等一个文件的补丁全到位才有意义）
+    state = {}
+    totals = {"applied": 0, "skipped": 0, "pending": 0, "failed": 0}
+    for p in patches:
+        pid = p.get("id", "?")
+        rel = p.get("file", "")
+        st = state.setdefault(rel, {"applied": 0, "skipped": 0, "pending": 0, "failed": 0})
+        fp = root / rel
+        if not fp.is_file():
+            print(f"✗ {pid}: 目标不存在 {rel}（先按 README 拷上游 / npm install）")
+            st["failed"] += 1
+            totals["failed"] += 1
+            continue
+        text = fp.read_text(encoding="utf-8")
+        if p.get("marker") and p["marker"] in text:
+            print(f"✓ {pid}: 已应用（跳过）")
+            st["skipped"] += 1
+            totals["skipped"] += 1
+            continue
+        if p.get("find") not in text:
+            print(f"✗ {pid}: 上游锚点失配 —— 上游可能已更新，需按 README「本地补丁」各节人工重做")
+            st["failed"] += 1
+            totals["failed"] += 1
+            continue
+        if args.check:
+            print(f"? {pid}: 待应用")
+            st["pending"] += 1
+            totals["pending"] += 1
+            continue
+        fp.write_text(text.replace(p["find"], p["replace"], 1), encoding="utf-8")
+        print(f"✓ {pid}: 已应用")
+        st["applied"] += 1
+        totals["applied"] += 1
+
+    # ── 哈希校验：仅对「全部补丁位」的目标做，避免 --check 下把未打补丁的原版误报为失败 ──
+    ledger = load_ledger_hashes()
+    print()
+    failed = totals["failed"]
+    verified = 0
+    for rel, expect in targets.items():
+        st = state.get(rel)
+        fp = root / rel
+        if st is None or not fp.is_file():
+            continue
+        if st["failed"]:
+            print(f"· {rel}: 因目标缺失或锚点失配，未做校验")
+            continue
+        if st["pending"]:
+            print(f"· {rel}: 尚有 {st['pending']} 条待应用（--check 只报告），未做校验")
+            continue
+        if not expect:
+            print(f"· {rel}: 私有层未记录 sha256，跳过校验")
+            continue
+        got = sha256(fp)
+        if got != expect:
+            print(f"✗ 校验失败 {rel}\n    期望 {expect}\n    实际 {got}")
+            failed += 1
+            continue
+        verified += 1
+        extra = ""
+        if rel in ledger:
+            extra = "（与公开账本一致）" if ledger[rel] == expect else "（⚠ 与公开账本不一致，需重签账本）"
+        print(f"✓ 校验通过 {rel}{extra}")
+
+    print(f"\n应用 {totals['applied']} · 跳过 {totals['skipped']} · 待应用 {totals['pending']} · 校验通过 {verified} · 失败 {failed}")
+    if failed:
+        print("提示：锚点失配时不要硬改——先跑 scripts/check-upstream-drift.sh 看上游是否已更新。")
+    return 1 if failed else 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

@@ -16,7 +16,7 @@
 | `agents/` | 三个自定义子代理：`research` / `scout` / `worker` |
 | `extensions/productivity/` | 自写的效率扩展套件，6 个模块 |
 | `npm/package.json` · `package-lock.json` | 扩展包的精确版本锁定 |
-| `scripts/` | 运维脚本：上游漂移检测器 + 快照账本（**非 pi 扩展**，故不放 `tools/`，见「上游更新策略」） |
+| `scripts/` | 运维脚本（**非 pi 扩展**，故不放 `tools/`，见「上游更新策略」）：漂移检测器 `check-upstream-drift.sh` + 快照账本 + 补丁应用器 `apply-local-patches.py` + 私密层包装器 `private.sh` |
 | `run-history.jsonl` | 子代理运行记录（任务已脱敏） |
 
 ## 明确排除的内容
@@ -281,41 +281,58 @@ cp -R /tmp/amos-src/extensions/prompt-snippets ~/.pi/agent/extensions/
 cp /tmp/amos-src/deprecated/extensions/context.ts ~/.pi/agent/extensions/
 cp /tmp/amos-src/deprecated/extensions/md-link.ts ~/.pi/agent/extensions/
 cp -R /tmp/amos-src/skills/pdf-reader ~/.pi/agent/skills-optional/ && cd ~/.pi/agent/skills-optional/pdf-reader && python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
-# bash-guard 需重打本地补丁①–⑥（见下方「bash-guard 本地补丁」各条说明；
-# 多机注意：补丁只存在于装有它们的机器，新机从 README 重建后需逐条重应用）
+# 打完上游原版后需重放本地补丁（编号见下方「本地补丁清单」）：
+#   python3 ~/.pi/agent/scripts/apply-local-patches.py    # 幂等 + sha256 校验
+# 补丁正文存于私密层（.pi-private/local-patches.json）：公开库不含上游源码。
+# 更省事的路径：直接接入私密层拿**成品文件**，checkout 即得，见「双层仓库架构」。
 ```
 
-**bash-guard 本地补丁**（上游按 `PI_SUBAGENT_DEPTH` 识别子代理，但本机两个子代理引擎
+**本地补丁清单（权威编号，与 `apply-local-patches.py --list` 一致）**：
+
+| id | 文件 | 作用 |
+|---|---|---|
+| `P1-subagent-detect` | bash-guard | 三重子代理检测 |
+| `P3-cmd-truncate` | bash-guard | 命令截断 160→120 |
+| `P4-high-only-gate` | bash-guard | 主会话仅拦 HIGH |
+| `P6-inline-selector` | bash-guard | 行内选择器（含选项标签/加粗/按键提示） |
+| `FC3-widget-off` | pi-filechanges | widget 默认关 |
+
+已作废：旧②（overlay 稳定化）、旧⑤的 overlay 期改动——二者被 P6 取代。
+下面的分节沿用旧叙事编号，标题已标注对应的 P 编号。
+
+**本地补丁 P1（子代理识别）**（上游按 `PI_SUBAGENT_DEPTH` 识别子代理，但本机两个子代理引擎
 均不注入该变量）：改为三重检测 `PI_SUBAGENT_ID`（@maplezzk pane 子代理）/
 `PI_SUBAGENT_RUNNER_CONFIG`（pi-subagents 无头 runner）/ `!stdin.isTTY`（通用无头）。
 
-**bash-guard 本地补丁 ④（主会话仅拦 HIGH）**：主会话原对任何 git 命令/管道/重定向都弹
+**本地补丁 P4（主会话仅拦 HIGH）**：主会话原对任何 git 命令/管道/重定向都弹
 Run/Abort。改为 MEDIUM（git status/diff/log、管道、重定向、mv -f 等）静默直通，
 HIGH（sudo / rm -rf / find -delete / git rm|clean -f|reset --hard|push --force / curl|sh / 磁盘工具）
 仍弹对话框；无 UI 时 HIGH 照旧 abort。子代理硬阻断清单不变。
 实测：git status 静默直通；rm -r* 复合命令弹「HIGH risk」对话框（含理由）。
 注：pi 会热加载扩展到运行中的会话——扩展装入后行为即生效。
 
-**bash-guard 本地补丁 ⑤（选项区可读性）**：选项区原仅箭头+着色区分，描述被宽度截断。
+**本地补丁 P3（命令截断）**：只有旧⑤的「命令显示截断 160→120」存活并独立成条（矮 pane 下不溢出）。
+
+> 以下为**历史记录（旧⑤原貌）**，其 overlay 期改动已随 P6 作废：选项区原仅箭头+着色区分，描述被宽度截断。
 改为：选项前分隔线（choose an action）、标签带图标（Run ⏎ / Abort ✕）与更明确描述、
 选中项加粗、底部按键提示行（↑↓ move · ⏎ confirm · esc = abort）、
 宽度 70%→85%（minWidth 56）、高度上限 60%→80%（矮 pane 曾把 Abort 行裁掉）、
 命令显示截断 160→120 字符。实测矮 pane 下双选项+提示完整渲染，↓+Enter 拦截生效。
 
-**bash-guard 本地补丁 ⑥（行内选择器）**：弹窗（overlay）改为**输入框位置的行内组件**
+**本地补丁 P6（行内选择器）**：弹窗（overlay）改为**输入框位置的行内组件**
 （非 overlay 的 custom() 临时替换编辑器，不再浮在聊天内容上），选项横排
 `❯ Run ⏎ executes as-is │ Abort ✕ blocks`，**←/→（兼容 ↑↓）切换**、⏎ 确认、esc 拦截。
 按键解析坑（实测抓包定位）：pi-tui 启用 kitty 键盘协议，方向键以 `\x1b[1;1:1C`
 参数化形式到达（非 \x1b[C 也非名称），按「CSI/SS3 序列的最终字母 A/B/C/D 判方向」
-统一解析。矮 pane 不再受 maxHeight 裁剪（行内无高度限制）。补丁②的锚定参数随本
-补丁作废（不再使用 overlay）。
+统一解析。矮 pane 不再受 maxHeight 裁剪（行内无高度限制）。
+旧补丁②（overlay 稳定化）的锚定参数与旧⑤的宽高/分隔线改动随本补丁一并作废。
 
-**pi-filechanges 本地补丁（默认关闭 widget）**：npm 包 `extensions/index.ts` 的
+**本地补丁 FC3（filechanges widget 默认关闭）**：npm 包 `extensions/index.ts` 的
 `showWidget` 硬编码 true 且无配置机制，本地改为 `false`——Δ 文件清单默认不显示，
 `/filechanges` 会话内仍可开；状态栏槽位（有改动时的一行摘要）保留。
 ⚠ `pi update npm:@johnnywu/pi-filechanges` 会还原此补丁，更新后需重打。
 
-**bash-guard 本地补丁 ②（UI 稳定化）**：对话框原为裸 `overlay: true`，居中锚点随命令长度
+**（已作废）旧补丁 ②（overlay 期 UI 稳定化）**：对话框原为裸 `overlay: true`，居中锚点随命令长度
 漂移且与部件堆栈（filechanges/subagents/prompt-snippets）显示冲突。改为
 `anchor: top-center + margin 2 + width 70% + maxHeight 60%` + 命令显示截断 160 字符 +
 显式 `handle.focus()`。实测短/长命令对话框标题行均钉在第 4 行，不再侵入编辑器区域。
@@ -335,32 +352,49 @@ spawn 子进程用 `--no-extensions` + 显式白名单）：见
 **新机器 bootstrap（顺序敏感）**：
 ```bash
 # 1. 公共层：按上方「还原本配置」clone / checkout
-# 2. 私密层：
+# 2. 私密层（顺序敏感：先 core.bare=false 再 core.worktree，否则 git 会警告
+#    「core.bare and core.worktree do not make sense」）
 git clone --bare https://github.com/SuTang-vain/pi-config-private.git ~/.pi/agent-private.git
-git --git-dir=~/.pi/agent-private.git config core.worktree ~/.pi/agent
 git --git-dir=~/.pi/agent-private.git config --bool core.bare false
+git --git-dir=~/.pi/agent-private.git config core.worktree ~/.pi/agent
 git --git-dir=~/.pi/agent-private.git checkout -f main
 # 3. 补运行时：cd extensions/bash-guard && npm install；pdf-reader venv；pi install 各包
 ```
 
-日常操作私密层：`bash tools/private.sh status|diff|commit|push`。
+日常操作私密层：`bash scripts/private.sh status|diff|commit|push`。包装器的 `add` 有闸门：
+拒绝 `-A`/`--all`/`-a` 与根级路径（工作树是整棵 `~/.pi/agent`，而私密层 index 只跟踪
+私密路径，一次 sweep 就会把 `auth.json`/`sessions/`/`node_modules` 卷进历史）。
 
 **已有公共库的机器接入私密层**（工作树已有内容，非全新 bootstrap）：
 ```bash
-cd ~/.pi/agent && git pull                       # 1. 公共层取最新（拿到 tools/private.sh）
+cd ~/.pi/agent && git pull                       # 1. 公共层取最新（拿到 scripts/private.sh）
 # 2. 若本地对 bash-guard/analyze-sessions 等私密路径有未提交手改 → 先自行备份
 git clone --bare https://github.com/SuTang-vain/pi-config-private.git ~/.pi/agent-private.git
-git --git-dir=~/.pi/agent-private.git config core.worktree ~/.pi/agent
 git --git-dir=~/.pi/agent-private.git config --bool core.bare false
+git --git-dir=~/.pi/agent-private.git config core.worktree ~/.pi/agent
 git --git-dir=~/.pi/agent-private.git config user.name  "SuTang-vain"
 git --git-dir=~/.pi/agent-private.git config user.email "183297372+SuTang-vain@users.noreply.github.com"
 git --git-dir=~/.pi/agent-private.git checkout -f main  # 3. 成品覆盖本地（含全部补丁）
 # 4. 运行时补装：cd extensions/bash-guard && npm install
 #                  cd skills-optional/pdf-reader && python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
-# 5. 验证：python3 tools/apply-local-patches.py --check  → 五补丁应全「已应用（跳过）」
-#          bash tools/check-upstream-drift.sh            → 上游列应全「未动」
+# 5. 验证：python3 scripts/apply-local-patches.py --check → 五补丁应全「已应用（跳过）」+ 哈希校验通过
+#          bash scripts/check-upstream-drift.sh          → 上游列应全「未动」
 ```
 两层推送前都过密钥扫描闸门（auth.json / sessions 永不入任何一层）。
+
+**私密层内容**：无证上游拷贝的**成品**（`extensions/bash-guard`、`prompt-snippets`、
+`context.ts`、`md-link.ts`、`skills/analyze-sessions`、`skills-optional/pdf-reader`）
++ 根级 `.gitignore`（白名单式，只放行 `extensions/` `skills/` `skills-optional/`
+`.pi-private/` 与 `.gitignore` 自身）
++ `.pi-private/local-patches.json`（补丁正文，公开库的应用器从这里读）。
+
+> ⚠️ **私密层的 `add` 必须走 `scripts/private.sh`。** 直接用 `git --git-dir=… add -A`
+> 会跳过闸门；而私密层 index 只跟踪私密路径，工作树却是整棵 `~/.pi/agent`——
+> 一次 sweep 就会把 `auth.json`（明文密钥）与 `sessions/`（私有对话）卷进历史。
+
+> ⚠️ **`git clean -xfd` 现在是双刃的。** 两层共享同一棵树，各自把对方的文件视为
+> 「未跟踪/被忽略」：在公共库跑 `-x` 会删掉 `auth.json`、`sessions/` **和整个私密层**；
+> 在私密库跑 `-x` 会删掉公共层。要清理先 `git status` 确认，或改用显式路径的 `git clean`。
 
 ## 上游更新策略
 
@@ -386,8 +420,8 @@ PI_DRIFT_SKIP_NPM=1 bash ~/.pi/agent/scripts/check-upstream-drift.sh   # 跳过 
 | 类 | 组件 | 更新动作 |
 |---|---|---|
 | **A 无补丁拷贝** | prompt-snippets / context.ts / md-link.ts / analyze-sessions / pdf-reader | 直接按「借鉴组件」节的重建命令重拷（上游更新=改进，本地无改动） |
-| **B 有补丁拷贝** | bash-guard（补丁①–⑥） | 先跑漂移检测 → 人工 diff 上游变更 → 对照源码内 `Local patch N:` 标记逐条重应用 → 重跑测试场景（sudo 拦截 / git status 直通 / 对话框交互链） |
-| **C 有补丁 npm** | @johnnywu/pi-filechanges（补丁③） | `pi update` 会覆写补丁；更新后重打一行改（showWidget=false）。**长期方案**：向上游提 PR 加配置项（包活跃维护中，PR 合并后补丁可退役） |
+| **B 有补丁拷贝** | bash-guard（P1/P3/P4/P6） | 先跑漂移检测 → 优先走工具链：更新私有层 `.pi-private/local-patches.json` → `scripts/apply-local-patches.py` 幂等重放 + sha256 校验；锚点失配才按下方各节人工重做 → 重跑测试场景（sudo 拦截 / git status 直通 / 对话框交互链） |
+| **C 有补丁 npm** | @johnnywu/pi-filechanges（FC3） | `pi update` 会覆写补丁；更新后重打一行改（showWidget=false）。**长期方案**：向上游提 PR 加配置项（包活跃维护中，PR 合并后补丁可退役） |
 | **D git 克隆** | pi-skills / scientific-agent-skills | 直接 `git pull`——sparse-checkout 保证排除项不回流，本地零修改故无冲突 |
 
 快照账本刷新：上游有更新并完成合并后，在本机重跑 `--refresh`。
