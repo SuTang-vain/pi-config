@@ -94,23 +94,25 @@ pi 会把**所有**已发现技能的 name + description 注入系统提示—�
 省下的钱不多（约 $0.024/会话），真正的收益是上下文空间与注意力不被稀释：
 163 个化学、量子、实验室自动化技能与日常编码无关。
 
-#### 实际生效的技能（12 个）
+#### 实际生效的技能（8 个）
 
 ```
-白名单 8 个 : exa-search · pi-agent · pyhealth · hypothesis-generation
-database-lookup · literature-review · paper-lookup · scikit-learn
+白名单 4 个 : exa-search · pi-agent（pi 自身文档，配置工作高频）
+            · literature-review · paper-lookup
 
 自动扫描 4 个 : ego-browser（~/.agents/skills/）
              : herdr（skills/herdr/）
              : analyze-sessions（skills/，amos 借鉴件）
              : vscode（pi-skills，唯一保留项）
+
+按需挂载 4 个 : pyhealth · hypothesis-generation · database-lookup · scikit-learn
+            （零调用转按需，128 会话实证；用法见下方 --skill 示例）
 ```
 
 > 零调用淘汰记录（128 个会话的调用统计实证）：sg-data-pack、gccli、gdcli、
 > gmcli、transcribe、youtube-transcript 六项从未被真实调用，已移出扫描路径
-> （见末尾「已移除」清单）。白名单中的 pyhealth / hypothesis-generation /
-> scikit-learn / database-lookup / pi-agent 同为零调用，属科研画像的合理储备，
-> 暂保留，3 个月后仍零调用则转按需挂载。
+> （见末尾「已移除」清单）。pyhealth / hypothesis-generation / scikit-learn /
+> database-lookup 四项零调用，2026-09-15 转按需挂载（见上）。
 
 需要其他技能时按需挂载：
 
@@ -261,6 +263,11 @@ cp -R /tmp/amos-src/skills/pdf-reader ~/.pi/agent/skills-optional/ && cd ~/.pi/a
 **bash-guard 本地补丁**（上游按 `PI_SUBAGENT_DEPTH` 识别子代理，但本机两个子代理引擎
 均不注入该变量）：改为三重检测 `PI_SUBAGENT_ID`（@maplezzk pane 子代理）/
 `PI_SUBAGENT_RUNNER_CONFIG`（pi-subagents 无头 runner）/ `!stdin.isTTY`（通用无头）。
+
+**bash-guard 本地补丁 ②（UI 稳定化）**：对话框原为裸 `overlay: true`，居中锚点随命令长度
+漂移且与部件堆栈（filechanges/subagents/prompt-snippets）显示冲突。改为
+`anchor: top-center + margin 2 + width 70% + maxHeight 60%` + 命令显示截断 160 字符 +
+显式 `handle.focus()`。实测短/长命令对话框标题行均钉在第 4 行，不再侵入编辑器区域。
 
 **子代理加载 bash-guard 的引擎配置**（仅 interactive-subagents 分支需要；该引擎
 spawn 子进程用 `--no-extensions` + 显式白名单）：见
