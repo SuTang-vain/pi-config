@@ -295,6 +295,7 @@ cp -R /tmp/amos-src/skills/pdf-reader ~/.pi/agent/skills-optional/ && cd ~/.pi/a
 | `P3-cmd-truncate` | bash-guard | 命令截断 160→120 |
 | `P4-high-only-gate` | bash-guard | 主会话仅拦 HIGH |
 | `P6-inline-selector` | bash-guard | 行内选择器（含选项标签/加粗/按键提示） |
+| `P7-force-push-floor` | bash-guard | 禁用模式地板补上强制推送 |
 | `FC3-widget-off` | pi-filechanges | widget 默认关 |
 
 已作废：旧②（overlay 稳定化）、旧⑤的 overlay 期改动——二者被 P6 取代。
@@ -321,11 +322,17 @@ HIGH（sudo / rm -rf / find -delete / git rm|clean -f|reset --hard|push --force 
 
 **本地补丁 P6（行内选择器）**：弹窗（overlay）改为**输入框位置的行内组件**
 （非 overlay 的 custom() 临时替换编辑器，不再浮在聊天内容上），选项横排
-`❯ Run ⏎ executes as-is │ Abort ✕ blocks`，**←/→（兼容 ↑↓）切换**、⏎ 确认、esc 拦截。
+`❯ Run ⏎ executes as-is │ Abort ✕ blocks`，**←/→（兼容 ↑↓）切换**、⏎ 确认、**`q` / `a` 中止**。
 按键解析坑（实测抓包定位）：pi-tui 启用 kitty 键盘协议，方向键以 `\x1b[1;1:1C`
 参数化形式到达（非 \x1b[C 也非名称），按「CSI/SS3 序列的最终字母 A/B/C/D 判方向」
 统一解析。矮 pane 不再受 maxHeight 裁剪（行内无高度限制）。
 旧补丁②（overlay 稳定化）的锚定参数与旧⑤的宽高/分隔线改动随本补丁一并作废。
+
+> ⚠ **中止键不能用 ESC**（故改用 `q` / `a`）。真机实测：同一个 pane 里 `esc` 能关掉 pi
+> 自带的选择器（2/2），却关不掉本弹窗；而把 `"\x1b"` 直接喂进 `handleInput` 是能中止的。
+> 即本弹窗逻辑无错，是 **pi 0.85.1 不把孤立 ESC 派发给聚焦的自定义组件**（TUI 喂原始
+> `data`，pi 自带弹窗走 `keybinding` 匹配）。ESC 分支保留，等 pi 修好后自动恢复可用。
+> 在 pi 修好前，`→` 再 `⏎` 也是可用路径（两步）。
 
 **本地补丁 FC3（filechanges widget 默认关闭）**：npm 包 `extensions/index.ts` 的
 `showWidget` 硬编码 true 且无配置机制，本地改为 `false`——Δ 文件清单默认不显示，
@@ -421,7 +428,7 @@ PI_DRIFT_SKIP_NPM=1 bash ~/.pi/agent/scripts/check-upstream-drift.sh   # 跳过 
 | 类 | 组件 | 更新动作 |
 |---|---|---|
 | **A 无补丁拷贝** | prompt-snippets / context.ts / md-link.ts / analyze-sessions / pdf-reader | 直接按「借鉴组件」节的重建命令重拷（上游更新=改进，本地无改动） |
-| **B 有补丁拷贝** | bash-guard（P1/P3/P4/P6） | 先跑漂移检测 → 优先走工具链：更新私有层 `.pi-private/local-patches.json` → `scripts/apply-local-patches.py` 幂等重放 + sha256 校验；锚点失配才按下方各节人工重做 → 重跑测试场景（sudo 拦截 / git status 直通 / 对话框交互链） |
+| **B 有补丁拷贝** | bash-guard（P1/P3/P4/P6/P7） | 先跑漂移检测 → 优先走工具链：更新私有层 `.pi-private/local-patches.json` → `scripts/apply-local-patches.py` 幂等重放 + sha256 校验；锚点失配才按下方各节人工重做 → 重跑测试场景（sudo 拦截 / git status 直通 / 对话框交互链 / **禁用地板的 push --force**） |
 | **C 有补丁 npm** | @johnnywu/pi-filechanges（FC3） | `pi update` 会覆写补丁；更新后重打一行改（showWidget=false）。**长期方案**：向上游提 PR 加配置项（包活跃维护中，PR 合并后补丁可退役） |
 | **D git 克隆** | pi-skills / scientific-agent-skills | 直接 `git pull`——sparse-checkout 保证排除项不回流，本地零修改故无冲突 |
 
