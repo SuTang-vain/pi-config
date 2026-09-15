@@ -97,6 +97,14 @@ git checkout main
 
 # ego-browser（浏览器自动化，经 skill 管理器安装，带 commit 哈希锁）
 # 见 https://github.com/citrolabs/ego-lite
+
+# figma-bridge（自有：Figma 设计数据 CLI，no MCP/no 桌面端；按需挂载，零注入）
+git clone --depth 1 https://github.com/SuTang-vain/figma-bridge \
+  ~/.pi/agent/skills-optional/figma-bridge
+cd ~/.pi/agent/skills-optional/figma-bridge && npm ci
+mkdir -p ~/.local/bin
+ln -sf ~/.pi/agent/skills-optional/figma-bridge/bin/figma-bridge.js ~/.local/bin/figma-bridge
+# 认证：~/.config/figma/api-key（chmod 600，本机已配）
 ```
 
 **注意**：`settings.json` 里的 `skills` 白名单（当前 **4** 项，见下方清单）指向
@@ -131,10 +139,12 @@ pi 会把**所有**已发现技能的 name + description 注入系统提示—�
 > （见末尾「已移除」清单）。pyhealth / hypothesis-generation / scikit-learn /
 > database-lookup 四项零调用，2026-09-15 转按需挂载（见上）。
 
-需要其他技能时按需挂载：
+需要其他技能时按需挂载（均零注入成本）：
 
 ```bash
-pi --skill ~/.pi/agent/skills-optional/scientific-agent-skills/skills/qutip/SKILL.md
+pi --skill ~/.pi/agent/skills-optional/scientific-agent-skills/skills/qutip/SKILL.md   # 科研库白名单外技能
+pi --skill ~/.pi/agent/skills-optional/pdf-reader/SKILL.md                             # 视觉混合 PDF（见借鉴组件表）
+pi --skill ~/.pi/agent/skills-optional/figma-bridge/SKILL.md                           # Figma 设计数据 CLI
 ```
 
 #### 网络检索的分工（避免冗余）
