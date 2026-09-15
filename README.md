@@ -242,6 +242,7 @@ Herdr 侧的完整说明——两个集成的差异、实测对照、以及**无
 | `bash-guard/` | `extensions/` | bash 拦截双层：主会话弹 Run/Abort 对话框（git 全系/管道/重定向/rm/sudo…，60s 防重试）；子代理硬阻断灾难清单（rm -rf/sudo/mkfs/git commit 等），无 UI 时安全失败为 abort |
 | `prompt-snippets/` | `extensions/` | 一次性行为规则：`alt+s` 勾选 snippet 随消息注入，发送后自动重置。自带 verify-not-assume 等 6 条 |
 | `context.ts` | `extensions/` | `/context` 上下文经济可视化：彩色网格按类别（系统提示/用户/助手/thinking/各工具结果/压缩/图片/剩余）分解 token 用量 + 缓存统计与优化建议 |
+| `pdf-reader/` | `skills-optional/`（**按需挂载**，零注入成本） | 视觉混合 PDF 解析：`pdf_info`/`pdf_extract` 文本 + `pdf_render` 页面渲染成 PNG 走视觉（公式/图表友好）。用法：`pi --skill ~/.pi/agent/skills-optional/pdf-reader/SKILL.md`；venv 已建（pymupdf 1.27.2）；`--pages` 从 1 起 |
 | `md-link.ts` | `extensions/` | Obsidian 协作桥：`/link-md` 链接 md 文件，agent 终答自动追加进文件（Obsidian 可渲染阅读）；用户直接改文件后 `/sd` 把编辑差异作为消息回传。适配注意：`/context` 的浮层会吞后续按键，操作前先 esc |
 
 ```bash
