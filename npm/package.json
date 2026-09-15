@@ -4,7 +4,7 @@
   "dependencies": {
     "@johnnywu/pi-filechanges": "^1.2.2",
     "@juicesharp/rpiv-ask-user-question": "^2.10.1",
-    "pi-goal-x": "^0.31.4",
-    "pi-subagents": "^0.68.0"
+    "@maplezzk/pi-interactive-subagents": "^3.16.0",
+    "pi-goal-x": "^0.31.4"
   }
 }

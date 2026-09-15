@@ -30,9 +30,9 @@
   "theme": "dark/dark",
   "tuiMode": "fullscreen",
   "packages": [
-    "npm:pi-subagents",
     "npm:@juicesharp/rpiv-ask-user-question",
     "npm:pi-goal-x",
-    "npm:@johnnywu/pi-filechanges"
+    "npm:@johnnywu/pi-filechanges",
+    "npm:@maplezzk/pi-interactive-subagents"
   ]
 }
