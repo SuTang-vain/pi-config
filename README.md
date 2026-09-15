@@ -270,7 +270,8 @@ cp -R /tmp/amos-src/extensions/prompt-snippets ~/.pi/agent/extensions/
 cp /tmp/amos-src/deprecated/extensions/context.ts ~/.pi/agent/extensions/
 cp /tmp/amos-src/deprecated/extensions/md-link.ts ~/.pi/agent/extensions/
 cp -R /tmp/amos-src/skills/pdf-reader ~/.pi/agent/skills-optional/ && cd ~/.pi/agent/skills-optional/pdf-reader && python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
-# bash-guard 需重打本地补丁①②（见下方「bash-guard 本地补丁」说明）
+# bash-guard 需重打本地补丁①–⑥（见下方「bash-guard 本地补丁」各条说明；
+# 多机注意：补丁只存在于装有它们的机器，新机从 README 重建后需逐条重应用）
 ```
 
 **bash-guard 本地补丁**（上游按 `PI_SUBAGENT_DEPTH` 识别子代理，但本机两个子代理引擎
@@ -325,6 +326,10 @@ spawn 子进程用 `--no-extensions` + 显式白名单）：见
 | **D git 克隆** | pi-skills / scientific-agent-skills | 直接 `git pull`——sparse-checkout 保证排除项不回流，本地零修改故无冲突 |
 
 快照账本刷新：上游有更新并完成合并后，重跑账本生成（README 本节有命令）。
+
+**多机注意**：账本的 `local_sha256` 是**生成它的那台机器**的快照（含补丁态）；
+其他机器跑检测器时，「本地漂移」列仅供自检——以各机源码内 `Local patch N:`
+标记的实际存在为准，不以上游/主账本哈希为强制标准。
 
 ## 已移除 / 已淘汰
 
