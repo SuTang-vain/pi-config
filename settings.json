@@ -19,12 +19,8 @@
   "skills": [
     "~/.pi/agent/skills-optional/scientific-agent-skills/skills/exa-search/SKILL.md",
     "~/.pi/agent/skills-optional/scientific-agent-skills/skills/pi-agent/SKILL.md",
-    "~/.pi/agent/skills-optional/scientific-agent-skills/skills/pyhealth/SKILL.md",
-    "~/.pi/agent/skills-optional/scientific-agent-skills/skills/hypothesis-generation/SKILL.md",
-    "~/.pi/agent/skills-optional/scientific-agent-skills/skills/database-lookup/SKILL.md",
     "~/.pi/agent/skills-optional/scientific-agent-skills/skills/literature-review/SKILL.md",
-    "~/.pi/agent/skills-optional/scientific-agent-skills/skills/paper-lookup/SKILL.md",
-    "~/.pi/agent/skills-optional/scientific-agent-skills/skills/scikit-learn/SKILL.md"
+    "~/.pi/agent/skills-optional/scientific-agent-skills/skills/paper-lookup/SKILL.md"
   ],
   "steeringMode": "one-at-a-time",
   "theme": "dark/dark",
