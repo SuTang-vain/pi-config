@@ -32,6 +32,7 @@
   "packages": [
     "npm:pi-subagents",
     "npm:@juicesharp/rpiv-ask-user-question",
-    "npm:pi-goal-x"
+    "npm:pi-goal-x",
+    "npm:@johnnywu/pi-filechanges"
   ]
 }
