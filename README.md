@@ -312,6 +312,20 @@ HIGH（sudo / rm -rf / find -delete / git rm|clean -f|reset --hard|push --force 
 spawn 子进程用 `--no-extensions` + 显式白名单）：见
 `extensions/pi-interactive-subagents/config.json` 的 `subagentExtensions` 字段。
 
+## 上游更新策略
+
+借鉴件分四类，各有既定的更新路径；`tools/check-upstream-drift.sh` 对照
+`tools/upstream-snapshot.json`（快照账本：本地/上游 sha256 + npm 版本）报三态漂移。
+
+| 类 | 组件 | 更新动作 |
+|---|---|---|
+| **A 无补丁拷贝** | prompt-snippets / context.ts / md-link.ts / analyze-sessions / pdf-reader | 直接按「借鉴组件」节的重建命令重拷（上游更新=改进，本地无改动） |
+| **B 有补丁拷贝** | bash-guard（补丁①–⑥） | 先跑漂移检测 → 人工 diff 上游变更 → 对照源码内 `Local patch N:` 标记逐条重应用 → 重跑测试场景（sudo 拦截 / git status 直通 / 对话框交互链） |
+| **C 有补丁 npm** | @johnnywu/pi-filechanges（补丁③） | `pi update` 会覆写补丁；更新后重打一行改（showWidget=false）。**长期方案**：向上游提 PR 加配置项（包活跃维护中，PR 合并后补丁可退役） |
+| **D git 克隆** | pi-skills / scientific-agent-skills | 直接 `git pull`——sparse-checkout 保证排除项不回流，本地零修改故无冲突 |
+
+快照账本刷新：上游有更新并完成合并后，重跑账本生成（README 本节有命令）。
+
 ## 已移除 / 已淘汰
 
 保留此清单是为了避免重装时又把它们拿回来（每一项都记录了移除理由与恢复方式）。

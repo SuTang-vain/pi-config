@@ -1,0 +1,57 @@
+{
+  "captured_at": "2026-09-15T23:04:47",
+  "components": [
+    {
+      "local_path": "extensions/bash-guard/index.ts",
+      "upstream_url": "https://raw.githubusercontent.com/amosblomqvist/pi-config/main/extensions/bash-guard/index.ts",
+      "patched": true,
+      "local_sha256": "3119b74aa3390f8054caf715b2da0f05989ad394cfa3f37abb9be00fd4904319",
+      "upstream_sha256_at_capture": "e79cadfdeb67a81c4fac7bba3b9be0e4eb5a07ccee417f9905bba08b47f96400"
+    },
+    {
+      "local_path": "extensions/prompt-snippets/index.ts",
+      "upstream_url": "https://raw.githubusercontent.com/amosblomqvist/pi-config/main/extensions/prompt-snippets/index.ts",
+      "patched": false,
+      "local_sha256": "b8f8183b1e0ff7251753c6f415fa59e511d9e776a97d4a09159540b6618388a7",
+      "upstream_sha256_at_capture": "b8f8183b1e0ff7251753c6f415fa59e511d9e776a97d4a09159540b6618388a7"
+    },
+    {
+      "local_path": "extensions/context.ts",
+      "upstream_url": "https://raw.githubusercontent.com/amosblomqvist/pi-config/main/deprecated/extensions/context.ts",
+      "patched": false,
+      "local_sha256": "3acba319b0aa8157ed823832b2f1649420b325e538e14423f44ac5d3451083e0",
+      "upstream_sha256_at_capture": "3acba319b0aa8157ed823832b2f1649420b325e538e14423f44ac5d3451083e0"
+    },
+    {
+      "local_path": "extensions/md-link.ts",
+      "upstream_url": "https://raw.githubusercontent.com/amosblomqvist/pi-config/main/deprecated/extensions/md-link.ts",
+      "patched": false,
+      "local_sha256": "0fd14ffdc71f3c5f3d149fd7ab99e07342a657879bfef8e7d3ce67180aee8e02",
+      "upstream_sha256_at_capture": "0fd14ffdc71f3c5f3d149fd7ab99e07342a657879bfef8e7d3ce67180aee8e02"
+    },
+    {
+      "local_path": "skills/analyze-sessions/SKILL.md",
+      "upstream_url": "https://raw.githubusercontent.com/amosblomqvist/pi-config/main/skills/analyze-sessions/SKILL.md",
+      "patched": false,
+      "local_sha256": "23ac2a4cd7480e77bf17768971fdfb1ad429531f67dd374aa2d75fd25d8f297a",
+      "upstream_sha256_at_capture": "23ac2a4cd7480e77bf17768971fdfb1ad429531f67dd374aa2d75fd25d8f297a"
+    },
+    {
+      "local_path": "skills-optional/pdf-reader/SKILL.md",
+      "upstream_url": "https://raw.githubusercontent.com/amosblomqvist/pi-config/main/skills/pdf-reader/SKILL.md",
+      "patched": false,
+      "local_sha256": "3103b8b54c7570eed155c4958aa15735458a6e973849b1c849a2e07f6b8c08a6",
+      "upstream_sha256_at_capture": "3103b8b54c7570eed155c4958aa15735458a6e973849b1c849a2e07f6b8c08a6"
+    }
+  ],
+  "npm_packages": {
+    "@johnnywu/pi-filechanges": {
+      "installed_version": "1.2.2",
+      "patched": true
+    },
+    "pi-subagents": {
+      "installed_version": "0.68.0",
+      "patched": false
+    }
+  }
+}
