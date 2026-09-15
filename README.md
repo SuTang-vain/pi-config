@@ -277,6 +277,13 @@ cp -R /tmp/amos-src/skills/pdf-reader ~/.pi/agent/skills-optional/ && cd ~/.pi/a
 均不注入该变量）：改为三重检测 `PI_SUBAGENT_ID`（@maplezzk pane 子代理）/
 `PI_SUBAGENT_RUNNER_CONFIG`（pi-subagents 无头 runner）/ `!stdin.isTTY`（通用无头）。
 
+**bash-guard 本地补丁 ④（主会话仅拦 HIGH）**：主会话原对任何 git 命令/管道/重定向都弹
+Run/Abort。改为 MEDIUM（git status/diff/log、管道、重定向、mv -f 等）静默直通，
+HIGH（sudo / rm -rf / find -delete / git rm|clean -f|reset --hard|push --force / curl|sh / 磁盘工具）
+仍弹对话框；无 UI 时 HIGH 照旧 abort。子代理硬阻断清单不变。
+实测：git status 静默直通；rm -r* 复合命令弹「HIGH risk」对话框（含理由）。
+注：pi 会热加载扩展到运行中的会话——扩展装入后行为即生效。
+
 **pi-filechanges 本地补丁（默认关闭 widget）**：npm 包 `extensions/index.ts` 的
 `showWidget` 硬编码 true 且无配置机制，本地改为 `false`——Δ 文件清单默认不显示，
 `/filechanges` 会话内仍可开；状态栏槽位（有改动时的一行摘要）保留。
