@@ -231,46 +231,6 @@ Herdr 侧的完整说明——两个集成的差异、实测对照、以及**无
 
 ---
 
-## 本分支方案：interactive-subagents（实验）
-
-> 此内容仅存在于 `interactive-subagents` 分支。`main` 仍是 pi-subagents 方案。
-
-本分支把子代理引擎换成 **@maplezzk/pi-interactive-subagents**（HazAT 原版的 fork），
-取舍依据是 2026-09-15 的两轮实测对决：
-
-### 为什么换
-
-它占据「同类 + pane + 结构化」这一格：子代理开在**真实可见的 pane** 里，
-人可直接打字插手（实测排队为 Steering，子代理服从），结果**内联回流**
-完成卡（无 pi-subagents 的临时文件竞态——该竞态 2/2 复现），
-widget 实时显示 `starting/active/waiting/stalled`，pane 完成后自动清理。
-
-### 代价（已知并接受）
-
-- 调度原语变薄：只有 spawn / interrupt / list / resume 四个动词，
-  无 workflowScript DAG、worktree 隔离、lanes、gates、用量预算
-- 无 preflight 校验：不存在的 agent 名静默回退默认配置
-- 每个子代理占一个 pane（并发受终端空间限制）；子代理启动约 2 倍慢（TUI 引导）
-- `agents/*.md` 沿用 pi-subagents 语法（acceptanceRole 等字段被忽略，基本兼容，
-  完整适配是 TODO）
-
-### 切换（node_modules 不入 git，需同步装卸）
-
-```bash
-# 回 main 方案：
-git checkout main
-pi remove npm:@maplezzk/pi-interactive-subagents && pi install npm:pi-subagents
-
-# 再试本方案：
-git checkout interactive-subagents
-pi remove npm:pi-subagents && pi install npm:@maplezzk/pi-interactive-subagents
-```
-
-### 已实测通过（herdr 后端）
-
-单发往返 / 并发双开 / 人中途插话改向 / pane 自动清理 / 结果内联回流 /
-与全部 6 个 productivity 扩展共存无冲突。
-
 ## 借鉴组件（来自 [amosblomqvist/pi-config](https://github.com/amosblomqvist/pi-config)）
 
 > 上游无 LICENSE，故这三个目录**不入库**（见 .gitignore），仅本地使用。
@@ -281,6 +241,8 @@ pi remove npm:pi-subagents && pi install npm:@maplezzk/pi-interactive-subagents
 | `analyze-sessions/` | `skills/` | 会话审计：`cost.py --since 7d --by project\|model\|session\|day` 成本汇总（含子代理）、`prompts.py` 提示词挖掘、跨会话检索。stdlib 零依赖 |
 | `bash-guard/` | `extensions/` | bash 拦截双层：主会话弹 Run/Abort 对话框（git 全系/管道/重定向/rm/sudo…，60s 防重试）；子代理硬阻断灾难清单（rm -rf/sudo/mkfs/git commit 等），无 UI 时安全失败为 abort |
 | `prompt-snippets/` | `extensions/` | 一次性行为规则：`alt+s` 勾选 snippet 随消息注入，发送后自动重置。自带 verify-not-assume 等 6 条 |
+| `context.ts` | `extensions/` | `/context` 上下文经济可视化：彩色网格按类别（系统提示/用户/助手/thinking/各工具结果/压缩/图片/剩余）分解 token 用量 + 缓存统计与优化建议 |
+| `md-link.ts` | `extensions/` | Obsidian 协作桥：`/link-md` 链接 md 文件，agent 终答自动追加进文件（Obsidian 可渲染阅读）；用户直接改文件后 `/sd` 把编辑差异作为消息回传。适配注意：`/context` 的浮层会吞后续按键，操作前先 esc |
 
 ```bash
 # 再获取（仓库无 LICENSE，仅限个人使用；勿并入本 MIT 仓库）

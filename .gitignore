@@ -53,3 +53,5 @@ extensions/herdr-agent-state.ts
 # ============================================================================
 extensions/bash-guard/
 extensions/prompt-snippets/
+extensions/md-link.ts
+extensions/context.ts
