@@ -253,7 +253,8 @@ PY
 
   echo
   echo "处理策略：无补丁组件→按 README「借鉴组件」节重建命令重拷；"
-  echo "  bash-guard→对照源码内 Local patch ①–⑥ 标记重应用并跑测试（sudo 拦截 / git status 直通 / 对话框交互链）；"
+  echo "  bash-guard→优先改私有层 .pi-private/local-patches.json 再跑 scripts/apply-local-patches.py 重放（P1/P3/P4/P6 + sha256 校验）；"
+  echo "    锚点失配才按源码内 Local patch 标记人工重做，并跑测试（sudo 拦截 / git status 直通 / 对话框交互链）；"
   echo "  npm 有补丁→pi update 后重打补丁（filechanges 的 showWidget 一行改）；"
   echo "  本机未安装→按 README 重建命令补齐后跑 --refresh 重签账本。"
 
