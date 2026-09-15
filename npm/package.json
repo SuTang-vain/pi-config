@@ -4,6 +4,8 @@
   "dependencies": {
     "@johnnywu/pi-filechanges": "^1.2.2",
     "@juicesharp/rpiv-ask-user-question": "^2.10.1",
+    "@moyai/pi-session-hoarder": "^0.2.0",
+    "@vanillagreen/pi-session-manager": "^2.0.1",
     "pi-goal-x": "^0.31.4",
     "pi-subagents": "^0.68.0"
   }

@@ -1,5 +1,5 @@
 {
-  "captured_at": "2026-09-16T00:31:47",
+  "captured_at": "2026-09-16T00:55:00",
   "components": [
     {
       "local_path": "extensions/bash-guard/index.ts",
@@ -51,6 +51,22 @@
     },
     "pi-subagents": {
       "installed_version": "0.68.0",
+      "patched": false
+    },
+    "@moyai/pi-session-hoarder": {
+      "installed_version": "0.2.0",
+      "patched": false
+    },
+    "@vanillagreen/pi-session-manager": {
+      "installed_version": "2.0.1",
+      "patched": false
+    },
+    "pi-goal-x": {
+      "installed_version": "0.31.4",
+      "patched": false
+    },
+    "@juicesharp/rpiv-ask-user-question": {
+      "installed_version": "2.10.1",
       "patched": false
     }
   }
