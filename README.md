@@ -290,6 +290,14 @@ HIGH（sudo / rm -rf / find -delete / git rm|clean -f|reset --hard|push --force 
 宽度 70%→85%（minWidth 56）、高度上限 60%→80%（矮 pane 曾把 Abort 行裁掉）、
 命令显示截断 160→120 字符。实测矮 pane 下双选项+提示完整渲染，↓+Enter 拦截生效。
 
+**bash-guard 本地补丁 ⑥（行内选择器）**：弹窗（overlay）改为**输入框位置的行内组件**
+（非 overlay 的 custom() 临时替换编辑器，不再浮在聊天内容上），选项横排
+`❯ Run ⏎ executes as-is │ Abort ✕ blocks`，**←/→（兼容 ↑↓）切换**、⏎ 确认、esc 拦截。
+按键解析坑（实测抓包定位）：pi-tui 启用 kitty 键盘协议，方向键以 `\x1b[1;1:1C`
+参数化形式到达（非 \x1b[C 也非名称），按「CSI/SS3 序列的最终字母 A/B/C/D 判方向」
+统一解析。矮 pane 不再受 maxHeight 裁剪（行内无高度限制）。补丁②的锚定参数随本
+补丁作废（不再使用 overlay）。
+
 **pi-filechanges 本地补丁（默认关闭 widget）**：npm 包 `extensions/index.ts` 的
 `showWidget` 硬编码 true 且无配置机制，本地改为 `false`——Δ 文件清单默认不显示，
 `/filechanges` 会话内仍可开；状态栏槽位（有改动时的一行摘要）保留。
