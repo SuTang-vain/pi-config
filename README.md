@@ -323,6 +323,28 @@ HIGH（sudo / rm -rf / find -delete / git rm|clean -f|reset --hard|push --force 
 spawn 子进程用 `--no-extensions` + 显式白名单）：见
 `extensions/pi-interactive-subagents/config.json` 的 `subagentExtensions` 字段。
 
+## 双层仓库架构：公共 + 私密
+
+本仓库（pi-config，public）承载**可分享的技艺**：本码扩展、agents、文档、工具。
+私密仓库 [pi-config-private](https://github.com/SuTang-vain/pi-config-private)（private）
+承载**不可再分发的内容**：无证上游拷贝（bash-guard 等）与补丁成品文件。
+两层共享同一工作树 `~/.pi/agent`：公共库用 `.git`，私密库用独立 git-dir
+`~/.pi/agent-private.git`（`core.worktree` 指向本树），互不干扰。
+
+**新机器 bootstrap（顺序敏感）**：
+```bash
+# 1. 公共层：按上方「还原本配置」clone / checkout
+# 2. 私密层：
+git clone --bare https://github.com/SuTang-vain/pi-config-private.git ~/.pi/agent-private.git
+git --git-dir=~/.pi/agent-private.git config core.worktree ~/.pi/agent
+git --git-dir=~/.pi/agent-private.git config --bool core.bare false
+git --git-dir=~/.pi/agent-private.git checkout -f main
+# 3. 补运行时：cd extensions/bash-guard && npm install；pdf-reader venv；pi install 各包
+```
+
+日常操作私密层：`bash tools/private.sh status|diff|commit|push`。
+两层推送前都过密钥扫描闸门（auth.json / sessions 永不入任何一层）。
+
 ## 上游更新策略
 
 借鉴件分四类，各有既定的更新路径；`tools/check-upstream-drift.sh` 对照
