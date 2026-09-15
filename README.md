@@ -133,6 +133,15 @@ pi --skill ~/.pi/agent/skills-optional/scientific-agent-skills/skills/qutip/SKIL
 
 ## 许可
 
-配置与自写扩展为本人的，按需取用。
-第三方内容（技能库、扩展包）遵循各自上游许可：
-`scientific-agent-skills` 为 MIT，其余见各自仓库。
+本仓库内容（配置与自写扩展）采用 **MIT**，见 [LICENSE](LICENSE)。
+
+第三方内容遵循各自上游许可，**不因本仓库的 MIT 而改变**：
+
+| 内容 | 许可 |
+|---|---|
+| 扩展包 `pi-subagents` / `pi-goal-x` / `@juicesharp/rpiv-ask-user-question` | 见各自 npm 包 |
+| 技能库 `scientific-agent-skills` | MIT（K-Dense AI） |
+| 技能库 `pi-skills` | 见 https://github.com/badlogic/pi-skills |
+| `ego-browser` | 见 https://github.com/citrolabs/ego-lite |
+
+（后三者由 `.gitignore` 排除，不在本仓库内。）
