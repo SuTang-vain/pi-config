@@ -24,7 +24,7 @@
 |---|---|---|
 | `auth.json` | 335 B | **含明文 API 密钥。公开仓库会被爬虫分钟级抓取。绝不提交。** |
 | `sessions/` | 75 MB | 私有对话记录 |
-| `skills/` · `skills-optional/` | 642 MB | 第三方技能库，可重装；体积也不适合入 git |
+| `skills/` · `skills-optional/` | 约 493 MB | 第三方技能库，可重装；体积也不适合入 git |
 | `npm/node_modules/` | 19 MB | 第三方包，由 `package-lock.json` 还原 |
 | `missions/` | 24 KB | 含本机绝对路径与用户名 |
 
@@ -49,8 +49,24 @@ cd ~/.pi/agent/npm && npm install
 # 用已装二进制自带的 release-matched 副本，比 GitHub master 更可靠：
 herdr --skill > ~/.pi/agent/skills/herdr/SKILL.md
 
-# pi-skills（8 个：brave-search / exa 搜索、浏览器工具、Gmail/Calendar/Drive CLI 等）
+# pi-skills（保留 6 个：Gmail/Calendar/Drive CLI、transcribe、vscode、youtube-transcript）
 git clone https://github.com/badlogic/pi-skills ~/.pi/agent/skills/pi-skills
+
+# 其中两个不需要，用 sparse-checkout **永久排除**（clone 工作区保持干净，git pull 不会带回、
+# 也不产生冲突）：
+#   browser-tools —— 与 ego-browser 能力完全重叠，却带 120 MB node_modules
+#   brave-search  —— 无 BRAVE_API_KEY，无法工作
+cd ~/.pi/agent/skills/pi-skills
+cat > .git/info/sparse-checkout <<'SPARSE'
+/*
+!/browser-tools
+!/brave-search
+SPARSE
+git sparse-checkout reapply
+rm -rf browser-tools        # sparse 只跳过已跟踪文件；node_modules 未被跟踪，需手动删（120 MB）
+
+# 备注：agent-reach 曾装在 ~/.agents/skills/，因依赖 OpenCLI/twitter-cli/bili-cli
+# 三套外部后端 + 浏览器登录态而移除（见 README 末“已移除”一节）
 
 # scientific-agent-skills（163 个科研技能，MIT，v2.64.0）
 git clone https://github.com/K-Dense-AI/scientific-agent-skills ~/.pi/agent/skills-optional/scientific-agent-skills
@@ -66,17 +82,45 @@ git clone https://github.com/K-Dense-AI/scientific-agent-skills ~/.pi/agent/skil
 #### 为什么只白名单 8 个？
 
 `skills-optional/` 里有 163 个科研技能，但历史使用统计显示实际只用到 8 个。
-pi 会把**所有**已发现技能的 name + description 注入系统提示——165 个技能约
-**19,300 tokens/会话**，白名单后降到约 **2,060 tokens**（省 89%）。
+pi 会把**所有**已发现技能的 name + description 注入系统提示——全量时约
+**19,300 tokens/会话**，收敛后降到约 **1,770 tokens**（省 91%）。
 
 省下的钱不多（约 $0.024/会话），真正的收益是上下文空间与注意力不被稀释：
 163 个化学、量子、实验室自动化技能与日常编码无关。
+
+#### 实际生效的技能（17 个）
+
+```
+白名单 8 个 : exa-search · pi-agent · pyhealth · hypothesis-generation
+database-lookup · literature-review · paper-lookup · scikit-learn
+
+自动扫描     : ego-browser（~/.agents/skills/）
+            : herdr（skills/herdr/）
+            : gccli · gdcli · gmcli · transcribe · vscode · youtube-transcript（pi-skills）
+            : sg-data-pack（~/.agents/skills/）
+```
 
 需要其他技能时按需挂载：
 
 ```bash
 pi --skill ~/.pi/agent/skills-optional/scientific-agent-skills/skills/qutip/SKILL.md
 ```
+
+#### 网络检索的分工（避免冗余）
+
+| 角色 | 承担者 | 说明 |
+|---|---|---|
+| 发现候选 URL | `exa-search` 技能 | 写文件 → 只取 `title+url`（~215 tok），结构化 JSON 可筛 |
+| URL → 净正文 | `exa_extract.py`（同技能自带） | 走 Exa `/contents`，支持批量，无需浏览器 |
+| 读透真实页面 | `ego-browser` | JS 重、登录墙、需点击的场景 |
+
+已移除的重叠项：`pi-web-access`（Exa 部分与 exa-search 重复，+810 tok/会话）、
+`brave-search`（无密钥）、`browser-tools`（120 MB，与 ego-browser 全面重叠）、
+`agent-reach`（依赖三套外部后端）。
+
+> ⚠️ 用 `exa-search` 时注意：`/answer` 与 `/search` 是两个端点。
+> 不传 `numResults` 才走 `/answer`（Exa 便宜 40% 且返回紧凑合成答案）；
+> 传了其他值会走 `/search`（Exa 更贵 + 返回大块拼接文本 + 本地成本翻倍）。
 
 ### 3. Herdr 集成（可选）
 
@@ -174,6 +218,22 @@ Herdr 侧的完整说明——两个集成的差异、实测对照、以及**无
 `contact_supervisor` 升级路径。
 
 ---
+
+## 已移除 / 已淘汰
+
+保留此清单是为了避免重装时又把它们拿回来（每一项都记录了移除理由与恢复方式）。
+
+| 已移除 | 曾占用 | 理由 | 恢复方式 |
+|---|---|---|---|
+| `pi-web-access` (npm) | 810 tok/会话 + 132 依赖 + 7 MB | Exa 部分与 `exa-search` 完全重复；PDF/YouTube 已被其他技能覆盖 | `pi install npm:pi-web-access` |
+| `browser-tools` | 120 MB | 8 个脚本 100% 被 `ego-browser` 覆盖；正文提取由 `exa_extract.py` 替代 | 改 `pi-skills` 的 sparse 规则后 `npm install` |
+| `brave-search` | 29 MB | 无 `BRAVE_API_KEY`，无法工作 | 同上（sparse 规则） |
+| `agent-reach` | 230 tok | 依赖 OpenCLI / twitter-cli / bili-cli 三套外部后端 + 浏览器登录态；其中 GitHub/YouTube/任意网页/语义搜索四项均已被 `gh` / `youtube-transcript` / `ego-browser` / `exa-search` 覆盖 | `mv ~/.pi/agent/skills-optional/agent-reach ~/.agents/skills/` |
+| `@jackwener/opencli` (npm -g) | 29 MB + 228 KB + 14 MB 常驻守护 | 仅 agent-reach 使用；agent-reach 移除后成为孤儿 | `npm i -g @jackwener/opencli` |
+| `minimax-cn` provider | 3 个死条目 | 无 API 密钥，选中即报错 | 编辑 `models-store.json` |
+
+> 注：`~/.hermes`（2.7 GB，Hermes Agent v0.17.0）**不是**这些工具的残留，
+> 而是一套独立框架，两者双向引用数为 0。清理时切勿混淆。
 
 ## 许可
 
