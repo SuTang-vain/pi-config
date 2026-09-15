@@ -1,11 +1,11 @@
 {
-  "captured_at": "2026-09-16T00:12:09",
+  "captured_at": "2026-09-16T00:31:47",
   "components": [
     {
       "local_path": "extensions/bash-guard/index.ts",
       "upstream_url": "https://raw.githubusercontent.com/amosblomqvist/pi-config/main/extensions/bash-guard/index.ts",
       "patched": true,
-      "local_sha256": "78f204d0917a127fe4b47b87098115af1e9158773f7c0d7e08630c76537290b9",
+      "local_sha256": "3881540cd611209fd5665df073a527b08c7ed1a17133952b720319f15cc9a741",
       "upstream_sha256_at_capture": "e79cadfdeb67a81c4fac7bba3b9be0e4eb5a07ccee417f9905bba08b47f96400"
     },
     {

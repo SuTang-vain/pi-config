@@ -296,7 +296,25 @@ cp -R /tmp/amos-src/skills/pdf-reader ~/.pi/agent/skills-optional/ && cd ~/.pi/a
 | `P4-high-only-gate` | bash-guard | 主会话仅拦 HIGH |
 | `P6-inline-selector` | bash-guard | 行内选择器（含选项标签/加粗/按键提示） |
 | `P7-force-push-floor` | bash-guard | 禁用模式地板补上强制推送 |
+| `P8-exec-view-helpers` | bash-guard | 「可执行视图」：命令文本 ≠ 会被执行的命令 |
+| `P9-floor-subagent-view` | bash-guard | 子代理地板改测可执行视图（修误报） |
+| `P10-floor-disabled-view` | bash-guard | 禁用模式地板同上 |
+| `P11-main-inline-payloads` | bash-guard | 主会话分析内联载荷（修漏报） |
 | `FC3-widget-off` | pi-filechanges | widget 默认关 |
+
+**P8–P11 的判定语义**（“命令文本”≠“会被执行的命令”）：
+
+| 形态 | 判定 | 例子 |
+|---|---|---|
+| 数据汇（echo/printf/cat/tee/grep/jq…）的实参与其 heredoc 正文 | 当**文本**，不拦 | `echo "先 rm -rf 旧目录"`、`cat <<EOF … rm -rf … EOF` |
+| 其余命令的 **散文标志**（`-m` / `--body` / `--title` …）后紧跟的那个 token | 当**文本**，不拦 | `git commit -m "mention rm -rf"` |
+| shell 包装器（sh/bash/eval/xargs/ssh…）的 `-c` 载荷与 heredoc 正文 | 当**真命令**，拦 | `bash -c "rm -rf /tmp/x"`、`bash <<EOF … EOF` |
+| 解释器（python `-c`、node `-e`、perl/ruby `-e`、php `-r`、awk/sed 程序） | **文本扫描**，拦 | `python3 -c "os.system('rm -rf /')"`、`awk 'BEGIN{system(…)}'` |
+| 未知命令 | 原样保留（不会因本补丁变宽松） | — |
+
+> ⚠️ 已知保留的误报（有意为之）：`sed`/`awk`/`less` 等**能反向执行 shell** 的命令
+> 不列入数据汇，故 `sed -n 's/rm -rf/x/p'` 仍会被拦；写文档谈危险命令时请用 `echo`/注释。
+> 另：`python3`/`node` 的 heredoc 正文按可执行内容处理，里面写危险字样同样会被拦（保守）。
 
 已作废：旧②（overlay 稳定化）、旧⑤的 overlay 期改动——二者被 P6 取代。
 下面的分节沿用旧叙事编号，标题已标注对应的 P 编号。
@@ -310,7 +328,7 @@ Run/Abort。改为 MEDIUM（git status/diff/log、管道、重定向、mv -f 等
 HIGH（sudo / rm -rf / find -delete / git rm|clean -f|reset --hard|push --force / curl|sh / 磁盘工具）
 仍弹对话框；无 UI 时 HIGH 照旧 abort。子代理硬阻断清单不变。
 实测：git status 静默直通；rm -r* 复合命令弹「HIGH risk」对话框（含理由）。
-注：pi 会热加载扩展到运行中的会话——扩展装入后行为即生效。
+注：**pi 不会自动热加载扩展**（实测：新增目录与已加载扩展的文件改动均不生效）——必须先 `/reload` 或重启 pi，装入/更新后的行为方才生效。
 
 **本地补丁 P3（命令截断）**：只有旧⑤的「命令显示截断 160→120」存活并独立成条（矮 pane 下不溢出）。
 
