@@ -22,8 +22,8 @@
 
 | 排除项 | 体积 | 原因 |
 |---|---|---|
-| `auth.json` | 335 B | **含明文 API 密钥。公开仓库会被爬虫分钟级抓取。绝不提交。** |
-| `sessions/` | 75 MB | 私有对话记录 |
+| `auth.json` | 468 B | **含明文 API 密钥。公开仓库会被爬虫分钟级抓取。绝不提交。** |
+| `sessions/` | 93 MB | 私有对话记录 |
 | `skills/` · `skills-optional/` | 约 493 MB | 第三方技能库，可重装；体积也不适合入 git |
 | `npm/node_modules/` | 19 MB | 第三方包，由 `package-lock.json` 还原 |
 | `missions/` | 24 KB | 含本机绝对路径与用户名 |
@@ -49,21 +49,27 @@ cd ~/.pi/agent/npm && npm install
 # 用已装二进制自带的 release-matched 副本，比 GitHub master 更可靠：
 herdr --skill > ~/.pi/agent/skills/herdr/SKILL.md
 
-# pi-skills（保留 6 个：Gmail/Calendar/Drive CLI、transcribe、vscode、youtube-transcript）
+# pi-skills（保留 1 个：vscode；其余 7 个经 128 会话调用统计为零调用而排除）
 git clone https://github.com/badlogic/pi-skills ~/.pi/agent/skills/pi-skills
 
-# 其中两个不需要，用 sparse-checkout **永久排除**（clone 工作区保持干净，git pull 不会带回、
+# 其中 7 个不需要，用 sparse-checkout **永久排除**（clone 工作区保持干净，git pull 不会带回、
 # 也不产生冲突）：
-#   browser-tools —— 与 ego-browser 能力完全重叠，却带 120 MB node_modules
-#   brave-search  —— 无 BRAVE_API_KEY，无法工作
+#   browser-tools    —— 与 ego-browser 能力完全重叠，却带 120 MB node_modules
+#   brave-search     —— 无 BRAVE_API_KEY，无法工作
+#   gccli/gdcli/gmcli/transcribe/youtube-transcript —— 零真实调用（128 会话实证）
 cd ~/.pi/agent/skills/pi-skills
 cat > .git/info/sparse-checkout <<'SPARSE'
 /*
 !/browser-tools
 !/brave-search
+!/gccli
+!/gdcli
+!/gmcli
+!/transcribe
+!/youtube-transcript
 SPARSE
 git sparse-checkout reapply
-rm -rf browser-tools        # sparse 只跳过已跟踪文件；node_modules 未被跟踪，需手动删（120 MB）
+rm -rf browser-tools youtube-transcript   # sparse 只跳过已跟踪文件；未被跟踪的 node_modules 需手动删
 
 # 备注：agent-reach 曾装在 ~/.agents/skills/，因依赖 OpenCLI/twitter-cli/bili-cli
 # 三套外部后端 + 浏览器登录态而移除（见 README 末“已移除”一节）
@@ -83,22 +89,27 @@ git clone https://github.com/K-Dense-AI/scientific-agent-skills ~/.pi/agent/skil
 
 `skills-optional/` 里有 163 个科研技能，但历史使用统计显示实际只用到 8 个。
 pi 会把**所有**已发现技能的 name + description 注入系统提示——全量时约
-**19,300 tokens/会话**，收敛后降到约 **1,770 tokens**（省 91%）。
+**19,300 tokens/会话**，收敛后降到约 **1,370 tokens**（省 93%）。
 
 省下的钱不多（约 $0.024/会话），真正的收益是上下文空间与注意力不被稀释：
 163 个化学、量子、实验室自动化技能与日常编码无关。
 
-#### 实际生效的技能（17 个）
+#### 实际生效的技能（11 个）
 
 ```
 白名单 8 个 : exa-search · pi-agent · pyhealth · hypothesis-generation
 database-lookup · literature-review · paper-lookup · scikit-learn
 
-自动扫描     : ego-browser（~/.agents/skills/）
-            : herdr（skills/herdr/）
-            : gccli · gdcli · gmcli · transcribe · vscode · youtube-transcript（pi-skills）
-            : sg-data-pack（~/.agents/skills/）
+自动扫描 3 个 : ego-browser（~/.agents/skills/）
+             : herdr（skills/herdr/）
+             : vscode（pi-skills，唯一保留项）
 ```
+
+> 零调用淘汰记录（128 个会话的调用统计实证）：sg-data-pack、gccli、gdcli、
+> gmcli、transcribe、youtube-transcript 六项从未被真实调用，已移出扫描路径
+> （见末尾「已移除」清单）。白名单中的 pyhealth / hypothesis-generation /
+> scikit-learn / database-lookup / pi-agent 同为零调用，属科研画像的合理储备，
+> 暂保留，3 个月后仍零调用则转按需挂载。
 
 需要其他技能时按需挂载：
 
@@ -179,6 +190,7 @@ Herdr 侧的完整说明——两个集成的差异、实测对照、以及**无
 | `zai-coding-cn` | 10 | 默认（`glm-5.3`，思考档 `high`） |
 | `deepseek` | 2 | 备选 |
 | `opencode-go` | 27 | 聚合网关，含多家模型 |
+| `kimi-coding` | 4 | Kimi 网关（`k3` / `kimi-for-coding` 等，思考档已配） |
 
 文件权限建议 `chmod 600 auth.json`。
 
@@ -231,9 +243,15 @@ Herdr 侧的完整说明——两个集成的差异、实测对照、以及**无
 | `agent-reach` | 230 tok | 依赖 OpenCLI / twitter-cli / bili-cli 三套外部后端 + 浏览器登录态；其中 GitHub/YouTube/任意网页/语义搜索四项均已被 `gh` / `youtube-transcript` / `ego-browser` / `exa-search` 覆盖 | `mv ~/.pi/agent/skills-optional/agent-reach ~/.agents/skills/` |
 | `@jackwener/opencli` (npm -g) | 29 MB + 228 KB + 14 MB 常驻守护 | 仅 agent-reach 使用；agent-reach 移除后成为孤儿 | `npm i -g @jackwener/opencli` |
 | `minimax-cn` provider | 3 个死条目 | 无 API 密钥，选中即报错 | 编辑 `models-store.json` |
+| `moonshotai-cn` provider | 4 个死条目 | 无 API 密钥（Kimi 模型由 kimi-coding 网关正常提供），选中即报错 | 编辑 `models-store.json` |
+| `sg-data-pack` 技能 | 符号链接 | 128 会话统计零调用；真身在 `~/.zcode/skills/`（zcode 自用），不受影响 | `ln -s ~/.zcode/skills/sg-data-pack ~/.agents/skills/sg-data-pack` |
+| `gccli`/`gdcli`/`gmcli`/`transcribe`/`youtube-transcript` 技能 | 各 4–108 KB | 128 会话统计零真实调用（历史"调用"均为 ls 列表误配） | 改 pi-skills sparse 规则；youtube-transcript 恢复后需 `npm install` |
+| `~/.hermes`（Hermes Agent 2.7 GB） | 2.7 GB | 框架休眠 2 个月；曾**藏有系统默认 node**，换血到 `/opt/homebrew/bin/node` v26 后整体删除 | 重跑 upstream 安装器；数据备份在 `~/Backups/hermes/` |
 
-> 注：`~/.hermes`（2.7 GB，Hermes Agent v0.17.0）**不是**这些工具的残留，
-> 而是一套独立框架，两者双向引用数为 0。清理时切勿混淆。
+> 注：`~/.hermes`（2.7 GB，Hermes Agent v0.17.0）曾是一套独立框架，但其 `node/`
+> **曾被当作系统默认 node**（`~/.local/bin/node` 指向它）。已先换血到
+> `/opt/homebrew/bin/node` v26、验证 pi-subagents 的 execPath 降级逻辑后才整体删除。
+> 教训：目录名判断不了归属，删除前先查双向引用与 PATH 入口。
 
 ## 许可
 
