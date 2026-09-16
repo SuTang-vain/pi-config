@@ -1,3 +1,7 @@
+> ⚠️ **本仓库已迁移归档(2026-09-16)**:配置体系已切换至 chezmoi 单一源(私有仓
+> `pi-chezmoi`,age 加密)。本仓冻结于 `1c7400c`,历史保留、只读。新机器接入与日常
+> 同步见该仓 `MIGRATION.md`;私密层 `pi-config-private` 同日冻结于 `b292535`。
+
 # pi-agent-config
 
 我的 [pi](https://github.com/badlogic/pi-mono) 编码代理配置。就地版本化于 `~/.pi/agent/`。
